@@ -1,6 +1,7 @@
 import pytest
 import requests
 
+
 def test_server_is_up_and_responding():
     url = "http://localhost:8000"
     

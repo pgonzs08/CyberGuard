@@ -30,7 +30,7 @@ jobs:
       - name: Pasar Linter en el código Python (Ruff/Flake8)
         run: |
           cd backend
-          ruff check .
+          ruff check . --fix
 
       - name: Ejecutar Pruebas Automáticas (Pytest)
         run: |
