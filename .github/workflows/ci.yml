@@ -20,22 +20,20 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Instalar dependencias del Backend
+      - name: Instalar dependencias del e iniciar servidor
         run: |
-          cd backend
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest ruff
+          docker-compose up backend
 
       - name: Pasar Linter en el código Python (Ruff/Flake8)
         run: |
-          cd backend
-          ruff check . --fix
+          docker-compose exec backend ruff check . --fix
 
       - name: Ejecutar Pruebas Automáticas (Pytest)
         run: |
-          cd backend
-          pytest tests/
+          docker-compose exec backend pytest tests/
+      - name: Cerrar el servidor
+        run: |
+          docker-compose down
 
   # Tarea 2: Validar el Frontend en React (Vite + TypeScript)
   frontend-checks:
