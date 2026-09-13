@@ -1,17 +1,14 @@
 """
 FastAPI Server
 """
-from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+import logging
 import os
 import sys
-import logging
+from contextlib import asynccontextmanager
 
-from bson import ObjectId
-from fastapi import FastAPI, status, HTTPException, Response, Cookie
-from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel
 import uvicorn
+from fastapi import FastAPI
+from motor.motor_asyncio import AsyncIOMotorClient
 
 MONGO_URI = os.environ["MONGO_URI"]
 DEBUG = os.environ.get("DEBUG", "").strip().lower() in {"1", "true", "on", "yes"}
@@ -38,10 +35,10 @@ async def lifespan(app: FastAPI):
         else:
             raise RuntimeError(f"Respuesta inesperada de Mongo ping: {pong}")
             
-    except Exception as e:
+    except TimeoutError as e:
         logger.error("Fallo crítico de conexión a MongoDB: %s", str(e))
         client.close()
-        raise e
+        raise TimeoutError(e)
 
     # Inyectar la base de datos en el estado global
     app.state.mongo_client = client
