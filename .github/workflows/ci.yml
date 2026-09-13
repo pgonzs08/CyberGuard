@@ -22,8 +22,9 @@ jobs:
 
       - name: Instalar dependencias del e iniciar servidor
         run: |
-          docker compose up backend
-
+          docker compose up backend -d
+          sleep 10
+          
       - name: Pasar Linter en el código Python (Ruff/Flake8)
         run: |
           docker compose exec backend ruff check . --fix
