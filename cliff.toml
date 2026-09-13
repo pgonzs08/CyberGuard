@@ -1,0 +1,58 @@
+[changelog]
+# Encabezado del archivo CHANGELOG
+header = """
+# Changelog
+
+Todos los cambios notables en este proyecto de Stack FARM serán documentados en este archivo.
+El formato está basado en [Keep a Changelog](https://keepachangelog.com).\n
+"""
+
+# Plantilla Jinja para renderizar el cuerpo del documento
+body = """
+{% if version %}\
+    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+    ## [Sin lanzar]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | upper_first }}
+    {% for commit in commits %}
+        - {% if commit.scope %}**[{{ commit.scope }}]** {% endif %}{{ commit.message | upper_first }} ({{ commit.id | truncate(length=7, end="") }})\
+    {% endfor %}
+{% endfor %}\n
+"""
+
+# Pie de página del changelog
+footer = """
+<!-- Generado automáticamente por git-cliff -->
+"""
+
+[git]
+# Forzar el parseo a minúsculas para evitar problemas con CamelCase
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+
+# Expresiones regulares para agrupar commits por tipo de cambio
+commit_parsers = [
+    { message = "^feat", group = "Características" },
+    { message = "^fix", group = "Corrección de Errores" },
+    { message = "^doc", group = "Documentación" },
+    { message = "^perf", group = "Rendimiento" },
+    { message = "^refactor", group = "Refactorización" },
+    { message = "^style", group = "Estilos" },
+    { message = "^test", group = "Pruebas" },
+    { message = "^chore|^ci", group = "Misceláneo y CI/CD" },
+    { message = ".*", drop = true } # Descarta commits que no sigan la norma
+]
+
+# Procesamiento de scopes para estandarizar el stack FARM
+commit_preprocessors = [
+    # Reemplaza scopes comunes para unificarlos en mayúsculas claras si es necesario
+    { pattern = "\\((api|backend|fastapi)\\)", replace = "(API)" },
+    { pattern = "\\((ui|frontend|react)\\)", replace = "(UI)" },
+    { pattern = "\\((db|mongo|mongodb)\\)", replace = "(DB)" },
+]
+
+# Ordenar commits por mensaje dentro de cada grupo
+sort_commits = "oldest"
