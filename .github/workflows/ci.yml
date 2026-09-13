@@ -22,18 +22,18 @@ jobs:
 
       - name: Instalar dependencias del e iniciar servidor
         run: |
-          docker-compose up backend
+          docker compose up backend
 
       - name: Pasar Linter en el código Python (Ruff/Flake8)
         run: |
-          docker-compose exec backend ruff check . --fix
+          docker compose exec backend ruff check . --fix
 
       - name: Ejecutar Pruebas Automáticas (Pytest)
         run: |
-          docker-compose exec backend pytest tests/
+          docker compose exec backend pytest tests/
       - name: Cerrar el servidor
         run: |
-          docker-compose down
+          docker compose down
 
   # Tarea 2: Validar el Frontend en React (Vite + TypeScript)
   frontend-checks:
