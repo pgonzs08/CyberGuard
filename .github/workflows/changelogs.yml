@@ -2,7 +2,7 @@ name: Generate Changelog and Tag Version
 
 on:
   workflow_run:
-    workflows: ["Nombre de tu Workflow de CI"] # 👈 Escribe aquí el 'name:' exacto de tu otro archivo YAML de CI
+    workflows: ["CI - Code Quality & Tests"]
     types:
       - completed
     branches:
@@ -12,7 +12,7 @@ jobs:
   changelog:
     name: Update Changelog & Tag
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Checkout code
