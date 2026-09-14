@@ -1,52 +1,13 @@
-name: Generate Changelog and Tag Version
-
+name: Changelog
 on:
-  workflow_run:
-    workflows: ["CI - Code Quality & Tests"]
+  release:
     types:
-      - completed
-    branches:
-      - main
-
+      - created
 jobs:
   changelog:
-    name: Update Changelog & Tag
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: "✏️ Generate release changelog"
+        uses: janheinrichmerker/action-github-changelog-generator@v2.3
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 0 
-
-      - name: Generate Changelog
-        uses: orhun/git-cliff-action@v4
-        with:
-          config: cliff.toml
-          args: --verbose --bump
-        env:
-          OUTPUT: CHANGELOG.md
-
-      - name: Commit, Tag and Push changes
-        run: |
-          git config --local user.email "github-actions[bot]@://github.com"
-          git config --local user.name "github-actions[bot]"
-          
-          # 1. Hacer commit del changelog a main
-          if [ -n "$(git status --porcelain CHANGELOG.md)" ]; then
-            git add CHANGELOG.md
-            git commit -m "chore(changelog): update CHANGELOG.md [skip ci]"
-            git push origin main
-          fi
-          
-          # 2. Leer la versión calculada por git-cliff y crear el tag en Git
-          NEW_TAG=$(git-cliff --bump --context | jq -r '..version')
-          
-          if [ "$NEW_TAG" != "null" ] && [ -n "$NEW_TAG" ]; then
-            if ! git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
-              git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
-              git push origin "$NEW_TAG"
-            fi
-          fi
+          token: ${{ secrets.GITHUB_TOKEN }} 
