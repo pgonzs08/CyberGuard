@@ -31,14 +31,14 @@ jobs:
 
       - name: Commit, Tag and Push changes
         run: |
-          git config --local user.email "github-actions[bot]@://github.com"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
           # 1. Hacer commit del changelog a main
           if [ -n "$(git status --porcelain CHANGELOG.md)" ]; then
             git add CHANGELOG.md
             git commit -m "chore(changelog): update CHANGELOG.md [skip ci]"
-            git push origin main
+            git push origin HEAD:main
           fi
           
           # 2. Leer la versión calculada por git-cliff y crear el tag en Git
