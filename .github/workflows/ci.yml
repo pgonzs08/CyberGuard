@@ -3,7 +3,7 @@ name: CI - Code Quality & Tests
 # Cuándo se dispara el workflow
 on:
   push:
-    branches: [ develop, main ]
+    branches: [ feature/* ]
   pull_request:
     branches: [ develop, main ]
 
