@@ -13,7 +13,7 @@ jobs:
     name: Update Changelog
     runs-on: ubuntu-latest
     # IMPORTANTE: Solo se ejecuta si la Pull Request fue aprobada y fusionada (merged)
-    # if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true
 
     permissions:
       contents: write
