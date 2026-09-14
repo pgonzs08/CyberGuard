@@ -18,6 +18,14 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Configurar Caché de Docker
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+      
       - name: Instalar dependencias del e iniciar servidor
         run: |
           docker compose up backend -d
