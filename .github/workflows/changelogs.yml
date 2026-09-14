@@ -1,10 +1,12 @@
 name: Generate Changelog on PR Merge
 
 on:
+  push:
+    branches:
+      - feature/*
   pull_request:
     branches:
       - main
-      - feature/*
     types:
       - closed
 
