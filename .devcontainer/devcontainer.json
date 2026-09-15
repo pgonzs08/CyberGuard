@@ -1,1 +1,14 @@
-{"image":"mcr.microsoft.com/devcontainers/universal:2"}
+{
+	"image": "mcr.microsoft.com/devcontainers/universal:2",
+	"portsAttributes": {
+		"6333": {
+			"label": "QDrant"
+		},
+		"8000": {
+			"label": "Backend"
+		},
+		"27017": {
+			"label": "MongoDB"
+		}
+	}
+}

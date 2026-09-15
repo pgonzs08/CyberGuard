@@ -26,7 +26,7 @@ class HistorialResponse(BaseModel):
     historial: list[MessageAnswer]
 
 
-router = APIRouter(prefix="/chatbot", tags=["Chatbot"])
+router = APIRouter(tags=["Chatbot"])
 
 @router.post("/conversaciones", status_code=status.HTTP_201_CREATED)
 async def iniciar_conversacion():
@@ -39,8 +39,7 @@ async def iniciar_conversacion():
     id_simulado = "chat_678abc123xyz"
     return {"conversacion_id": id_simulado, "mensaje": "Sesión de chat iniciada"}
 
-
-@router.post("/conversaciones/{conversacion_id}/mensajes", response_model=ConversacionResponse)
+@router.post("/conversaciones/{conversacion_id}", response_model=ConversacionResponse)
 async def enviar_mensaje(conversacion_id: str, payload: MessageBase):
     """
     Envía un mensaje del usuario al chatbot.
@@ -73,7 +72,7 @@ async def enviar_mensaje(conversacion_id: str, payload: MessageBase):
     }
 
 
-@router.get("/conversaciones/{conversacion_id}/historial", response_model=HistorialResponse)
+@router.get("/conversaciones/{conversacion_id}", response_model=HistorialResponse)
 async def obtener_historial(conversacion_id: str, limite: int | None = 20):
     """
     Recupera los últimos mensajes de una conversación específica desde tu DAL.
