@@ -3,7 +3,7 @@ import requests
 
 
 def test_server_is_up_and_responding():
-    url = "http://localhost:8000"
+    url = "http://localhost:8000/"
     
     try:
         # Realiza la petición HTTP GET con un tiempo de espera de 5 segundos
