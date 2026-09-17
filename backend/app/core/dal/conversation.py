@@ -1,12 +1,11 @@
-import datetime
-
-from motor.motor_asyncio import AsyncIOMotorCollection
-from pymongo import ReturnDocument
-
-from pydantic import BaseModel, Field
+from datetime import date, datetime, timezone
+from uuid import uuid4
 
 from bson import ObjectId
-from uuid import uuid4
+from motor.motor_asyncio import AsyncIOMotorCollection
+from pydantic import BaseModel, Field
+from pymongo import ReturnDocument
+
 
 class MessageBase(BaseModel):
     content: str = Field(..., example="How can I make a safe password?",description="Content of a new message")
@@ -32,7 +31,7 @@ class Message(BaseModel):
         return Message(
             id = uuid4().hex,
             role = msg.role,
-            timetag = datetime.datetime.now().isoformat(),
+            timetag = datetime.now(tz=datetime.timezone.utc).isoformat(),
             content = msg.content
         )
 
@@ -42,7 +41,7 @@ class Conversation(BaseModel):
     id: ObjectId
     name: str = Field(..., description="A name that describes the conversation topic")
     owner: ObjectId = Field(..., description="User Id of the creator of the conversation")
-    creation_date: datetime.date = Field(..., description="Date of creation of the conversation")
+    creation_date: date = Field(..., description="Date of creation of the conversation")
     content: list[Message] = Field(..., description= "A list of all the messages sent in chronological order")
 
     @staticmethod
@@ -61,7 +60,7 @@ class Conversation(BaseModel):
             id= ObjectId(),
             name = name,
             owner = owner,
-            creation_date = datetime.date.fromisoformat(historic[0].timetag).isoformat(),
+            creation_date = date.fromisoformat(historic[0].timetag).isoformat(),
             content = historic
         )
 
@@ -69,11 +68,11 @@ class ConversationSummary(BaseModel):
     id: ObjectId = Field(..., description="The Id of the conversation summarized")
     name: str = Field(..., description="The name of the conversation summarized")
     owner: ObjectId = Field(..., description="Owner of the conversation summarized")
-    creation_date: datetime.date = Field(..., description="Date of creation of the conversation summarized")
+    creation_date: date = Field(..., description="Date of creation of the conversation summarized")
     msg_count: int = Field(..., description="Number of messages in the conversation")
 
     @staticmethod
-    def from_conversation(doc) -> 'ConversationSummary':
+    def from_document(doc) -> 'ConversationSummary':
         return ConversationSummary(
             id = doc["_id"],
             name = doc["name"],
@@ -117,7 +116,7 @@ class ConversationDAL:
 
     async def create_conversation(self, owner: str | ObjectId, name: str, session=None) -> str:
         response = await self._collection.insert_one(
-            {"name":name, "owner": owner, "creation_date": datetime.date.today().isoformat(),"content":[]},
+            {"name":name, "owner": owner, "creation_date": datetime.now(tz=timezone.utc).date().isoformat(),"content":[]},
             session=session,
         )
 
@@ -146,7 +145,7 @@ class ConversationDAL:
                         "_id": uuid4().hex,
                         "role": message.role,
                         "content": message.content, 
-                        "timetag": datetime.datetime.now().isoformat()
+                        "timetag": datetime.now(tz=timezone.utc).isoformat()
                     }
                 }
             },
@@ -161,7 +160,7 @@ class ConversationDAL:
             {"_id": ObjectId(doc_id), "content._id": item_id},
             {"$set":{
                     "items.$.content": content,
-                    "items.$.timetag": datetime.datetime.now().isoformat()
+                    "items.$.timetag": datetime.now(tz=timezone.utc).isoformat()
                 },
             },
             session=session,
