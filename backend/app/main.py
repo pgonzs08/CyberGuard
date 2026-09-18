@@ -2,8 +2,7 @@
 FastAPI Server
 """
 import logging
-import os
-import sys
+
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -11,10 +10,14 @@ from fastapi import FastAPI
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from .api.api_router import router as api_router
+from .core.settings import stettings
 
-MONGO_URI = os.environ["MONGO_URI"]
-DEBUG = os.environ.get("DEBUG", "").strip().lower() in {"1", "true", "on", "yes"}
-EXPIRATION_MINUTES = 3*60*24 #3 días
+import os
+import sys
+
+MONGO_URI = settings.MONGO_URI
+DEBUG = settings.DEBUG
+EXPIRATION_MINUTES = settings.EXPIRATION_MINUTES
 
 logger = logging.getLogger("uvicorn")
 
