@@ -9,8 +9,8 @@ import uvicorn
 from fastapi import FastAPI
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from .api.api_router import router as api_router
-from .core.settings import stettings
+from app.api.api_router import router as api_router
+from app.core.settings import settings
 
 import os
 import sys

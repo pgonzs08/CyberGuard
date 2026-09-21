@@ -6,6 +6,7 @@ from datetime import datetime
 from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
 
+from app.services.conversation_orchestrator import Orchestrator
 
 class MessageBase(BaseModel):
     contenido: str = Field(..., example="¿Cómo funciona el stack FARM?")
@@ -35,7 +36,7 @@ async def iniciar_conversacion():
     Devuelve el ID de la conversación generado en MongoDB.
     """
     # Aquí llamarías a tu DAL/Repository: 
-    # conversacion_id = await ChatRepository.crear_nueva_sesion()
+    conversacion_id = await ChatRepository.crear_nueva_sesion()
     id_simulado = "chat_678abc123xyz"
     return {"conversacion_id": id_simulado, "mensaje": "Sesión de chat iniciada"}
 

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from .chatbot_api import router as chatbot_router
+from app.api.chatbot_api import router as chatbot_router
 
 router = APIRouter(tags=["API"])
 
