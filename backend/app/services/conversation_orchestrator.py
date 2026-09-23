@@ -1,7 +1,10 @@
 from bson import ObjectId
 
+from langchain_nvidia_ai_endpoints import ChatNVIDIA
+
 from app.core.dal.conversation import ConversationDAL, Conversation, MessageBase, Message
 from app.services.agent import Agent
+import app.core.settings as settings
 
 class Orchestrator:
     def __init__(self, db_client):
@@ -9,7 +12,7 @@ class Orchestrator:
 
         client = ChatNVIDIA(
                     model="nvidia/nemotron-3.5-lightning-30b-a3b",
-                    api_key="$NVIDIA_API_KEY", 
+                    api_key=settings.NVIDIA_API_KEY, 
                     temperature=1,
                     top_p=0.95,
                     max_tokens=16384,
