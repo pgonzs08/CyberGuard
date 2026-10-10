@@ -6,7 +6,6 @@ from motor.motor_asyncio import AsyncIOMotorCollection
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
 
-
 class MessageBase(BaseModel):
     content: str = Field(..., example="How can I make a safe password?",description="Content of a new message")
     role: str = Field(..., description="Who sent the message")
@@ -136,7 +135,7 @@ class ConversationDAL:
         )
         return response.deleted_count == 1
 
-    async def add_meesage(self, id: str|ObjectId, message:MessageBase, session=None) -> Conversation | None:
+    async def add_message(self, id: str|ObjectId, message:MessageBase, session=None) -> Conversation | None:
         result = await self._collection.find_one_and_update(
             {"_id": ObjectId(id)},
             {
@@ -155,12 +154,12 @@ class ConversationDAL:
         if result:
             return Conversation.from_doc(result) 
 
-    async def change_contents(self, doc_id: str|ObjectId, item_id: str, content: str, session=None) -> Conversation|None:
+    async def change_contents(self, conv_id: str|ObjectId, msg_id: str, content: str, session=None) -> Conversation|None:
         result = await self._collection.find_one_and_update(
-            {"_id": ObjectId(doc_id), "content._id": item_id},
+            {"_id": ObjectId(conv_id), "content._id": msg_id},
             {"$set":{
-                    "items.$.content": content,
-                    "items.$.timetag": datetime.now(tz=timezone.utc).isoformat()
+                    "content.$.content": content,
+                    "content.$.timetag": datetime.now(tz=timezone.utc).isoformat()
                 },
             },
             session=session,
@@ -169,7 +168,7 @@ class ConversationDAL:
         if result:
             return Conversation.from_doc(result)
 
-    async def delete_item(self, doc_id: str|ObjectId, msg_id: str, session=None) -> Conversation | None:
+    async def delete_message(self, doc_id: str|ObjectId, msg_id: str, session=None) -> Conversation | None:
         result = await self._collection.find_one_and_update(
             {"_id": ObjectId(doc_id)},
             {"$pull":{
