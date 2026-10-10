@@ -1,26 +1,25 @@
 from bson import ObjectId
+from langchain_nvidia_ai_endpoints import ChatNVIDIA
 
-
-from app.core import settings
 from app.core.dal.conversation import ConversationDAL, Conversation, MessageBase, Message
 from app.services.agent import Agent
-
-import json
-import os
-from langchain_openai import ChatOpenAI
+import app.core.settings as settings
 
 class Orchestrator:
     def __init__(self, db_client):
         self._conv_dal = ConversationDAL(db_client)
-        self._chatbot = Agent(ChatOpenAI(
-                            model="deepseek-ai/deepseek-v4.1-flash",
-                            openai_api_key=settings.NVIDIA_API_KEY,
-                            openai_api_base="https://integrate.api.nvidia.com/v1",
-                            temperature=1,
-                            top_p=0.95,
-                            max_tokens=262144,
-                            streaming=False
-                        ))
+
+        client = ChatNVIDIA(
+                    model="nvidia/nemotron-3.5-lightning-30b-a3b",
+                    api_key=settings.NVIDIA_API_KEY, 
+                    temperature=1,
+                    top_p=0.95,
+                    max_tokens=16384,
+                    reasoning_budget=16384,
+                    chat_template_kwargs={"enable_thinking":False},
+                )
+        
+        self._chatbot = Agent(client, "Eres CyberGuard, un asistente conversacional de ciberseguridad para todos los públicos.")
 
     async def send_message(self, conv_id: str|ObjectId, msg: MessageBase):
         """

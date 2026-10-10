@@ -1,6 +1,9 @@
 """
 FastAPI Server
 """
+
+import os
+import sys
 import logging
 
 from contextlib import asynccontextmanager
@@ -10,10 +13,8 @@ from fastapi import FastAPI
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.api.api_router import router as api_router
-from app.core.settings import settings
+import app.core.settings as settings
 
-import os
-import sys
 
 MONGO_URI = settings.MONGO_URI
 DEBUG = settings.DEBUG

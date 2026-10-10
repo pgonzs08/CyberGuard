@@ -10,8 +10,9 @@ qdrant-client>=1.8.0
 langchain>=0.1.13
 langchain-community>=0.0.29
 langchain-core>=0.1.33
-langchain-openai>=0.1.0
-cohere>=5.1.0
+# langchain-openai>=0.1.0 # Aún no se usa
+langchain_nvidia_ai_endpoints
+# cohere>=5.1.0 # Aún no se usa
 
 # --- Base de Datos NoSQL ---
 motor>=3.3.2
