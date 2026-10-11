@@ -1,18 +1,23 @@
 """
 FastAPI Server
 """
-import logging
-import os
+
 import sys
+import logging
+
 from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI
 from motor.motor_asyncio import AsyncIOMotorClient
 
-MONGO_URI = os.environ["MONGO_URI"]
-DEBUG = os.environ.get("DEBUG", "").strip().lower() in {"1", "true", "on", "yes"}
-EXPIRATION_MINUTES = 3*60*24 #3 días
+from app.api.api_router import router as api_router
+import app.core.settings as settings
+
+
+MONGO_URI = settings.MONGO_URI
+DEBUG = settings.DEBUG
+EXPIRATION_MINUTES = settings.EXPIRATION_MINUTES
 
 logger = logging.getLogger("uvicorn")
 
@@ -50,11 +55,15 @@ async def lifespan(app: FastAPI):
     #Cerrar aplicación
     client.close()
 
+#Crear la app
 app = FastAPI(title="CiberGuard API", lifespan=lifespan, debug=DEBUG)
 
 @app.get("/")
 async def root():
-    return {"message": "CyberGuard API running"}
+    return {"message": "CyberGuard Backend Server is Running"}
+
+#Incluir los routers a servicios
+app.include_router(api_router, prefix="/api")
 
 def main(argv=sys.argv[1:]):
     try:
