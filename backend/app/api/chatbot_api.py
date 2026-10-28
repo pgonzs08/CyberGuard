@@ -15,7 +15,7 @@ class MessageAnswer(BaseModel):
     id: str
     rol: str = Field(..., example="assistant")  # "user" o "assistant"
     contenido: str
-    fecha_creacion: datetime
+    creation_date: datetime
 
 class ConversacionResponse(BaseModel):
     conversacion_id: str
@@ -61,13 +61,13 @@ async def enviar_mensaje(conversacion_id: str, payload: MessageBase):
             "id": "msg_user_1",
             "rol": "user",
             "contenido": payload.contenido,
-            "fecha_creacion": ahora
+            "creation_date": ahora
         },
         "respuesta_bot": {
             "id": "msg_bot_1",
             "rol": "assistant",
             "contenido": respuesta,
-            "fecha_creacion": ahora
+            "creation_date": ahora
         }
     }
 
@@ -81,8 +81,8 @@ async def obtener_historial(conversacion_id: str, limite: int | None = 20):
     # historial = await ChatRepository.obtener_mensajes(conversacion_id, limite)
     
     historial_simulado = [
-        {"id": "1", "rol": "user", "contenido": "Hola", "fecha_creacion": datetime.now(tz=datetime.utc)},
-        {"id": "2", "rol": "assistant", "contenido": "¿En qué puedo ayudarte?", "fecha_creacion": datetime.now(tz=datetime.utc)}
+        {"id": "1", "rol": "user", "contenido": "Hola", "creation_date": datetime.now(tz=datetime.utc)},
+        {"id": "2", "rol": "assistant", "contenido": "¿En qué puedo ayudarte?", "creation_date": datetime.now(tz=datetime.utc)}
     ]
     
     return {

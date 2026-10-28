@@ -10,14 +10,12 @@ class Orchestrator:
         self._conv_dal = ConversationDAL(db_client)
 
         client = ChatNVIDIA(
-                    model="nvidia/nemotron-3.5-lightning-30b-a3b",
-                    api_key=settings.NVIDIA_API_KEY, 
+                    model="nvidia/nemotron-3.5-bolt-e4b",
+                    api_key=settings.NVIDIA_API_KEY,
                     temperature=1,
                     top_p=0.95,
-                    max_tokens=16384,
-                    reasoning_budget=16384,
-                    chat_template_kwargs={"enable_thinking":False},
-                )
+                    max_completion_tokens=1024,
+                    )
         
         self._chatbot = Agent(client, "Eres CyberGuard, un asistente conversacional de ciberseguridad para todos los públicos.")
 
@@ -37,4 +35,4 @@ class Orchestrator:
         return self._conv_dal.delete_conversation(conv_id)
 
     async def edit_conversation(self, conv_id: str|ObjectId, msg_id: str, content:str):
-            return self._conv_dal.change_contents(conv_id)
+        return self._conv_dal.change_contents(conv_id)
