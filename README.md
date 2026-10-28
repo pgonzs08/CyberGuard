@@ -97,7 +97,7 @@ A continuación se documentan los endpoints principales de la API REST del backe
 ```json
 {
   "conversacion_id": "conv_67a8b9c1",
-  "fecha_creacion": "2026-10-12T10:00:00Z",
+  "creation_date": "2026-10-12T10:00:00Z",
   "estado": "activo"
 }
 
@@ -111,8 +111,8 @@ A continuación se documentan los endpoints principales de la API REST del backe
 
 ```json
 {
-  "remitente": "usuario",
-  "contenido": "¿Cómo puedo mitigar la vulnerabilidad CVE-2021-44228 en mi servidor?"
+  "role": "usuario",
+  "content": "¿Cómo puedo mitigar la vulnerabilidad CVE-2021-44228 en mi servidor?"
 }
 
 ```
@@ -125,7 +125,7 @@ A continuación se documentan los endpoints principales de la API REST del backe
   "conversacion_id": "conv_67a8b9c1",
   "respuesta_agente": "Para mitigar Log4Shell (CVE-2021-44228), debes actualizar la librería Log4j a la versión 2.15.0 o superior...",
   "referencias_mitre": ["T1190", "T1078"],
-  "timestamp": "2026-10-12T10:01:15Z"
+  "timetag": "2026-10-12T10:01:15Z"
 }
 
 ```
@@ -147,15 +147,15 @@ A continuación se documentan los endpoints principales de la API REST del backe
 ```json
 {
   "conversacion_id": "conv_67a8b9c1",
-  "mensajes": [
+  "messages": [
     {
-      "remitente": "usuario",
-      "contenido": "¿Qué es el vector de ataque T1190?",
+      "role": "usuario",
+      "content": "¿Qué es el vector de ataque T1190?",
       "timestamp": "2026-10-12T09:55:00Z"
     },
     {
-      "remitente": "agente",
-      "contenido": "El vector T1190 se refiere a Explotación de Aplicaciones Públicas...",
+      "role": "agente",
+      "content": "El vector T1190 se refiere a Explotación de Aplicaciones Públicas...",
       "timestamp": "2026-10-12T09:55:05Z"
     }
   ]
@@ -171,7 +171,7 @@ A continuación se documentan los endpoints principales de la API REST del backe
 
 ```json
 {
-  "nuevo_contenido": "¿Cómo puedo mitigar esta vulnerabilidad en versiones antiguas de OpenSSL?"
+  "new_content": "¿Cómo puedo mitigar esta vulnerabilidad en versiones antiguas de OpenSSL?"
 }
 
 ```
@@ -375,9 +375,86 @@ A continuación se documentan los endpoints principales de la API REST del backe
     {
       "reporte_id": "rep_998877",
       "titulo": "Informe de Mitigación - Log4Shell",
-      "fecha_creacion": "2026-10-12T10:30:00Z"
+      "creation_date": "2026-10-12T10:30:00Z"
     }
   ]
 }
 
 ```
+
+## 6. Especificación de flujo agéntico
+
+El flujo agéntico de **CyberGuard** implementa una arquitectura modular y eficiente basada en LangGraph que, mediante una estrategia de cascada de modelos (*model cascading*), optimiza un presupuesto de tokens ajustado sin sacrificar precisión ni seguridad. Desde la reescritura inicial del contexto y la clasificación inteligente del enrutador, las peticiones se dirigen dinámicamente hacia agentes especializados en vulnerabilidades técnicas (con soporte RAG en Qdrant) o en asesoramiento general, para luego ser procesadas por un sintetizador y auditadas por un filtro final de *guardrails*, garantizando así respuestas precisas, rentables y seguras para el usuario.
+
+```mermaid
+flowchart TB
+    Start(("Mensaje Usuario")) --> CR["Context Resolver<br><small><i>meta/llama-3.1-8b-instruct</i></small>"]
+    CR --> Router["Router / Clasificador<br><small><i>nvidia/nemotron-3-nano</i></small>"]
+    
+    Router -->|CVE Técnico| CVE["CVE Retrieval Agent<br><small><i>nvidia/nemotron-3-super</i></small>"]
+    Router -->|General| Gen["General Agent<br><small><i>meta/llama-3.1-8b-instruct</i></small>"]
+    
+    CVE --> Q[("Base de Datos QDrant")]
+    Q --> CVE
+    
+    CVE --> Synth["Synthesizer Agent<br><small><i>nvidia/nemotron-3-super</i></small>"]
+    Gen --> Synth
+    
+    Synth --> Guard["Safety & Guardrails<br><small><i>nvidia/llama-3.1-nemotron-safety-guard-8b</i></small>"]
+    Guard --> End(("Respuesta Segura"))
+
+    %% Leyenda de colores: 
+    %% Fondo (Tokens): Rojo = Alto, Ámbar = Medio, Verde = Bajo
+    %% Borde (Criticidad): Rojo grueso = Alto, Ámbar = Medio, Verde = Bajo
+    style CR fill:#ffe0b2,stroke:#f57c00,stroke-width:2px,color:#000
+    style Router fill:#c8e6c9,stroke:#d32f2f,stroke-width:3px,color:#000
+    style CVE fill:#ffcccc,stroke:#d32f2f,stroke-width:3px,color:#000
+    style Gen fill:#ffe0b2,stroke:#f57c00,stroke-width:2px,color:#000
+    style Q fill:#f0f0f0,stroke:#333,stroke-width:1px,color:#000
+    style Synth fill:#ffcccc,stroke:#d32f2f,stroke-width:3px,color:#000
+    style Guard fill:#c8e6c9,stroke:#d32f2f,stroke-width:3px,color:#000
+```
+
+## Explicación de la Arquitectura de Agentes y Model Cascading
+
+Para optimizar al máximo el presupuesto limitado de **CyberGuard** sin sacrificar la precisión ni la seguridad, la arquitectura implementa una estrategia de **Model Cascading**. Esto permite asignar modelos ligeros a tareas repetitivas o de control, y modelos potentes únicamente a las fases de razonamiento crítico.
+
+---
+
+### Listado y Desglose de Nodos
+
+#### Context Resolver
+
+* **Rol:** Analiza el historial reciente de la conversación para reescribir la pregunta actual del usuario, dotándola de contexto conversacional (por ejemplo, interpretando a qué se refiere si dice *"¿tiene parche?"*).
+* **Modelo:** `meta/llama-3.1-8b-instruct`
+* **Por qué se usa:** Ofrece un balance óptimo (nivel medio de tokens y criticidad moderada) para procesar texto histórico sin encarecer innecesariamente la entrada.
+
+#### Router / Clasificador
+
+* **Rol:** Evalúa la intención del mensaje para decidir si debe derivarse al especialista en vulnerabilidades técnicas o al asesor general de seguridad.
+* **Modelo:** `nvidia/nemotron-3-nano`
+* **Por qué se usa:** Es un modelo ultra ligero y de bajísimo coste. Como su única tarea es clasificar la entrada y devolver una etiqueta corta, garantiza una velocidad inmediata y ahorra recursos masivos en cada interacción.
+
+#### Retrieval Agent
+
+* **Rol:** Realiza la búsqueda semántica en la base de datos vectorial Qdrant y analiza los fragmentos técnicos de las vulnerabilidades encontradas.
+* **Modelo:** `nvidia/nemotron-3-super`
+* **Por qué se usa:** Es una tarea de máxima criticidad y consumo denso de información. Se requiere un modelo de gran capacidad de razonamiento para interpretar correctamente los datos de los CVEs y evitar errores técnicos.
+
+#### General Agent
+
+* **Rol:** Atiende dudas conceptuales, de concienciación y buenas prácticas de ciberseguridad que no requieren consultar la base de datos de vulnerabilidades.
+* **Modelo:** `meta/llama-3.1-8b-instruct`
+* **Por qué se usa:** Proporciona explicaciones claras y fluidas con un consumo de tokens controlado, evitando gastar modelos pesados en charlas generales.
+
+#### Synthesizer Agent
+
+* **Rol:** Combina todo el contexto procesado (ya sea de los CVEs o del asesor general) y redacta la respuesta final estructurada y profesional para la interfaz de React.
+* **Modelo:** `nvidia/nemotron-3-super`
+* **Por qué se usa:** Al ser la cara visible de CyberGuard ante el usuario, necesita la máxima fluidez, coherencia y precisión redactora de un modelo de alta gama.
+
+#### Safety & Guardrails
+
+* **Rol:** Actúa como auditor final de seguridad, revisando el mensaje generado antes de enviarlo para detectar y bloquear posibles *jailbreaks* o instrucciones maliciosas de explotación.
+* **Modelo:** `nvidia/llama-3.1-nemotron-safety-guard-8b`
+* **Por qué se usa:** Es un modelo especializado nativamente en moderación y seguridad. Ofrece un filtrado estricto y rápido con un coste computacional bajo, protegiendo la plataforma de usos indebidos.
