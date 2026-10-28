@@ -1,111 +1,78 @@
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+@import "tailwindcss";
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+@custom-variant dark (&:where(.dark, .dark *));
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@theme {
+  /* -------------------------------------------------------------------------- */
+  /* 🔴 COLORES PRIMARIOS Y SECUNDARIOS (Base por defecto / Modo Claro)          */
+  /* -------------------------------------------------------------------------- */
+  --color-primary-50:  #ffeef0;
+  --color-primary-100: #ffdce0;
+  --color-primary-500: #d73a49; /* Rojo principal GitHub */
+  --color-primary-600: #cb2431;
+  --color-primary-900: #86181d;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  --color-secondary-900: #24292e; 
+  --color-secondary-800: #2f363d;
+  --color-secondary-700: #444d56;
+
+  /* -------------------------------------------------------------------------- */
+  /* 💻 ESTRUCTURA TECNOLÓGICA (Modo Claro - Default)                           */
+  /* -------------------------------------------------------------------------- */
+  --color-surface-bg:    #fafbfc; /* --color-gray-000 */
+  --color-surface-card:  #f6f8fa; /* --color-gray-100 */
+  --color-border-subtle: #e1e4e8; /* --color-gray-200 */
+  --color-text-main:     #24292e; /* --color-gray-900 */
+  --color-text-muted:    #6a737d; /* --color-gray-500 */
+
+  /* 🔵 Acentos funcionales (Modo Claro) */
+  --color-info:    #0366d6; 
+  --color-success: #28a745; 
+  --color-warning: #f9c513; 
 }
 
+/* -------------------------------------------------------------------------- */
+/* 🌙 MODO OSCURO (Automático por sistema y manual por clase .dark)           */
+/* -------------------------------------------------------------------------- */
+
+/* Aplicación automática si el sistema operativo está en modo oscuro */
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+    --color-primary-50:  #86181d;
+    --color-primary-500: #f97583;
+    --color-primary-600: #ea4a5a;
+    --color-primary-900: #ffeef0;
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
+    --color-secondary-base: #1b1f23;
 
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
+    --color-surface-bg:    #24292e;
+    --color-surface-card:  #2f363d;
+    --color-border-subtle: #444d56;
+    --color-text-main:     #fafbfc;
+    --color-text-muted:    #959da5;
 
-body {
-  margin: 0;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
+    --color-info:    #79b8ff;
+    --color-success: #34d058;
+    --color-warning: #ffdf5d;
   }
 }
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
+/* Aplicación manual cuando el contenedor o la etiqueta raíz tenga la clase .dark */
+.dark, :root:has(.dark) {
+  --color-primary-50:  #86181d;
+  --color-primary-500: #f97583;
+  --color-primary-600: #ea4a5a;
+  --color-primary-900: #ffeef0;
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+  --color-secondary-base: #1b1f23;
+
+  --color-surface-bg:    #24292e;
+  --color-surface-card:  #2f363d;
+  --color-border-subtle: #444d56;
+  --color-text-main:     #fafbfc;
+  --color-text-muted:    #959da5;
+
+  --color-info:    #79b8ff;
+  --color-success: #34d058;
+  --color-warning: #ffdf5d;
 }
