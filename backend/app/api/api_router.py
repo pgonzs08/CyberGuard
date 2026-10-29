@@ -8,4 +8,4 @@ router = APIRouter(tags=["API"])
 async def api_root():
     return {"message": "CyberGuard API Running"}
 
-router.include_router(chatbot_router, prefix="/chatbot")
+router.include_router(chatbot_router, prefix="/conversaciones")

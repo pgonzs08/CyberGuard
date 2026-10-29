@@ -23,7 +23,7 @@ const API_BASE_URL = 'http://localhost:8000/api';
  */
 export async function createConversation(ownerId: string = 'user_123', name: string = 'Nueva Conversación'): Promise<{ conversacion_id: string; mensaje: string }> {
   try {
-    const response = await fetch(`${API_BASE_URL}/conversaciones`, {
+    const response = await fetch(`${API_BASE_URL}/conversaciones/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -58,7 +58,7 @@ export async function createConversation(ownerId: string = 'user_123', name: str
  */
 export async function sendMessage(msg: string, conversation_id: string): Promise<Message> {
   try {
-    const response = await fetch(`${API_BASE_URL}/conversaciones/${conversation_id}`, {
+    const response = await fetch(`${API_BASE_URL}/conversaciones/${conversation_id}/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

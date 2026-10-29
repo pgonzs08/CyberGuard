@@ -28,18 +28,18 @@ class HistorialResponse(BaseModel):
 
 router = APIRouter(tags=["Chatbot"])
 
-@router.post("/conversaciones", status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED)
 async def iniciar_conversacion():
     """
     Crea una nueva sesión de chat única.
     Devuelve el ID de la conversación generado en MongoDB.
     """
     # Aquí llamarías a tu DAL/Repository: 
-    conversacion_id = await ChatRepository.crear_nueva_sesion()
+    conversacion_id = await Orchestrator.create_conversation()
     id_simulado = "chat_678abc123xyz"
     return {"conversacion_id": id_simulado, "mensaje": "Sesión de chat iniciada"}
 
-@router.post("/conversaciones/{conversacion_id}", response_model=ConversacionResponse)
+@router.post("/{conversacion_id}", response_model=ConversacionResponse)
 async def enviar_mensaje(conversacion_id: str, payload: MessageBase):
     """
     Envía un mensaje del usuario al chatbot.
@@ -72,7 +72,7 @@ async def enviar_mensaje(conversacion_id: str, payload: MessageBase):
     }
 
 
-@router.get("/conversaciones/{conversacion_id}", response_model=HistorialResponse)
+@router.get("/{conversacion_id}", response_model=HistorialResponse)
 async def obtener_historial(conversacion_id: str, limite: int | None = 20):
     """
     Recupera los últimos mensajes de una conversación específica desde tu DAL.

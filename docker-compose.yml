@@ -32,6 +32,7 @@ services:
       - cyberguard_net
     environment:
       - CHOKIDAR_USEPOLLING=true  # Útil si estás en Windows/Mac para que Docker detecte los cambios de archivos
+      - VITE_API_URL=http://localhost:8000
     command: npm run dev -- --host 0.0.0.0
   # --- Base de Datos NoSQL (MongoDB) ---
   mongo:
