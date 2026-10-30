@@ -65,7 +65,6 @@ export async function sendMessage(msg: string, conversation_id: string): Promise
       },
       body: JSON.stringify({
         content: msg,
-        timetag: new Date().toISOString()
       }),
     });
 

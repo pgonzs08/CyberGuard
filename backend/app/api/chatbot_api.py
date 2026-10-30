@@ -1,12 +1,16 @@
 """
  Este archivo guarda APIs de consulta al al chat de CyberGuard. Estas consultas son creadas mediante el envío y la edicción de mensajes.
 """
-from datetime import datetime
+from datetime import datetime, timezone
+import re
+import uuid
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status
 from pydantic import BaseModel, Field
 
-from app.services.conversation_orchestrator import Orchestrator
+from app.services.chatService import ChatService
+from app.services.qdrantService import get_qdrant_service
+from app.services.mongoService import get_mongo_service
 
 class MessageBase(BaseModel):
     contenido: str = Field(..., example="¿Cómo funciona el stack FARM?")
@@ -16,6 +20,14 @@ class MessageAnswer(BaseModel):
     rol: str = Field(..., example="assistant")  # "user" o "assistant"
     contenido: str
     creation_date: datetime
+
+class MessageRequest(BaseModel):
+    content: str
+
+class MessageResponse(BaseModel):
+    conversacion_id: str
+    respuesta_agente: MessageAnswer
+
 
 class ConversacionResponse(BaseModel):
     conversacion_id: str
@@ -28,48 +40,51 @@ class HistorialResponse(BaseModel):
 
 router = APIRouter(tags=["Chatbot"])
 
+# Fábrica para instanciar el servicio inyectando Qdrant (y opcionalmente MongoDB)
+def get_chat_service(qdrant_service = Depends(get_qdrant_service), mongo_service=Depends(get_mongo_service)) -> ChatService:
+    return ChatService(qdrant_service=qdrant_service, mongo_db=mongo_service)
+
 @router.post("/", status_code=status.HTTP_201_CREATED)
-async def iniciar_conversacion():
+async def iniciar_conversacion(chat_service: ChatService = Depends(get_chat_service)):
     """
     Crea una nueva sesión de chat única.
     Devuelve el ID de la conversación generado en MongoDB.
     """
     # Aquí llamarías a tu DAL/Repository: 
-    conversacion_id = await Orchestrator.create_conversation()
-    id_simulado = "chat_678abc123xyz"
-    return {"conversacion_id": id_simulado, "mensaje": "Sesión de chat iniciada"}
+    conversation_id = await chat_service.create_conversation()
+    return {"conversacion_id": conversation_id, "mensaje": "Sesión de chat iniciada"}
+    
 
-@router.post("/{conversacion_id}", response_model=ConversacionResponse)
-async def enviar_mensaje(conversacion_id: str, payload: MessageBase):
-    """
-    Envía un mensaje del usuario al chatbot.
-    Procesa la respuesta (puedes inyectar tu servicio RAG aquí) y guarda todo en el DAL.
-    """
-    # 1. Validar que la conversación exista en base de datos
-    # if not await ChatRepository.existe_conversacion(conversacion_id):
-    #     raise HTTPException(status_code=404, detail="La sesión de chat no existe")
+@router.post("/{conversacion_id}", response_model=MessageResponse)
+async def enviar_mensaje_conversacion(
+    conversacion_id: str = Path(..., description="ID único de la conversación"),
+    payload: MessageRequest = None,
+    chat_service: ChatService = Depends(get_chat_service)
+):
+    try:
 
-    # 2. Guardar el mensaje del usuario en el DAL
-    # 3. Invocar la lógica de tu módulo RAG o LLM
-    # respuesta_texto = await RagsService.generar_respuesta(payload.contenido, conversacion_id)
-    respuesta = "NOT IMPLEMENTED: No se responder a preguntas todavía"
+        # 1. Procesar el mensaje a través del flujo agéntico de LangGraph
+        result = await chat_service.process_message(
+            message=payload.content,
+            conversation_id=conversacion_id
+        )
+        
+        respuesta_texto = result["response"]
 
-    ahora = datetime.now(datetime.timezone.utc())
-    return {
-        "conversacion_id": conversacion_id,
-        "mensaje_usuario": {
-            "id": "msg_user_1",
-            "rol": "user",
-            "contenido": payload.contenido,
-            "creation_date": ahora
-        },
-        "respuesta_bot": {
-            "id": "msg_bot_1",
-            "rol": "assistant",
-            "contenido": respuesta,
-            "creation_date": ahora
-        }
-    }
+        # 2. Generar metadatos de respuesta exigidos
+        mensaje_id = f"msg_{uuid.uuid4().hex[:8]}"
+        timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+        return MessageResponse(
+            mensaje_id=mensaje_id,
+            conversacion_id=conversacion_id,
+            respuesta_agente=respuesta_texto,
+            timestamp=timestamp
+        )
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail=f"Error al procesar el mensaje en la conversación: {str(e)}")
 
 
 @router.get("/{conversacion_id}", response_model=HistorialResponse)

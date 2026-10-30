@@ -2,11 +2,10 @@ from typing import List, Dict, Any
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from app.core.dal.conversation import Conversation, MessageBase
 
-class Agent:
+class AgentNode:
     def __init__(self, llm, system_prompt):
         # Inicialización del cliente NIM usando las APIs de NVIDIA
         self.llm = llm
-        
         self.system_prompt = system_prompt
 
     def _build_langchain_messages(self, conv: Conversation) -> List[Any]:
