@@ -2,9 +2,9 @@ import os
 
 from dotenv import load_dotenv
 
-assert os.path.exists("./app/.env"), os.listdir("./app")
+assert os.path.exists("./.env"), os.listdir("./")
 
-load_dotenv("./app/.env")
+load_dotenv("./.env")
 
 
 DEBUG = os.environ.get("DEBUG", "").strip().lower() in {"1", "true", "on", "yes"}

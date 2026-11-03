@@ -23,7 +23,7 @@ class ChatService:
             historical_messages = []
         if conversation:
             for msg in conversation.content:
-                historical_messages.append(AIMessage(msg.content) if msg.role.lower() is "ai" else HumanMessage(msg.content))
+                historical_messages.append(AIMessage(msg.content) if msg.role.lower() == "ai" else HumanMessage(msg.content))
         
         # 2. Construir el estado inicial del grafo
         initial_state = {

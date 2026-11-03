@@ -4,6 +4,8 @@ from langgraph.graph.message import add_messages
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 
+from app.services.mas.node import AgentNode
+
 # 1. Definición del Estado del Grafo
 class CyberGuardState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
@@ -13,25 +15,32 @@ class CyberGuardState(TypedDict):
     draft_response: str        # Respuesta del sintetizador
     final_response: str        # Respuesta auditada por guardrails
 
-    # Inicialización de los modelos NVIDIA NIM
-llm_nano = ChatNVIDIA(model="nvidia/nemotron-3-nano", temperature=0.0)
-llm_8b = ChatNVIDIA(model="meta/llama-3.1-8b-instruct", temperature=0.3)
-llm_super = ChatNVIDIA(model="nvidia/nemotron-3-super", temperature=0.1)
-llm_guard = ChatNVIDIA(model="nvidia/llama-3.1-nemotron-safety-guard-8b", temperature=0.0)
+    # Parámetros de los modelos NVIDIA NIM
+llm_nano = {"model": "nvidia/nemotron-3-nano", "temperature": 0.0}
+llm_8b = {"model":"meta/llama-3.1-8b-instruct", "temperature":0.3}
+llm_super = {"model":"nvidia/nemotron-3-super", "temperature":0.1}
+llm_guard = {"model":"nvidia/llama-3.1-nemotron-safety-guard-8b", "temperature":0.0}
+
+context_solver_agent = AgentNode(**llm_8b)
+router_agent = AgentNode(**llm_nano)
+cve_retrieval_agent = AgentNode(**llm_nano)
+general_agent = AgentNode(**llm_8b)
+synthesizer_agent = AgentNode(**llm_super)
+guard_agent = AgentNode(**llm_guard)
 
 # Nodo 1: Context Resolver (meta/llama-3.1-8b-instruct)
 def context_resolver_node(state: CyberGuardState):
     messages = state["messages"]
     # Reasigna/contextualiza la última pregunta usando el historial reciente
     prompt = f"Basándote en el historial de chat, reescribe la última pregunta del usuario para que sea autocontenida y clara:\nHistorial: {messages[-4:]}"
-    response = llm_8b.invoke([HumanMessage(content=prompt)])
+    response = context_solver_agent([HumanMessage(content=prompt)])
     return {"resolved_query": response.content}
 
 # Nodo 2: Router / Clasificador (nvidia/nemotron-3-nano)
 def router_node(state: CyberGuardState):
     query = state["resolved_query"]
     prompt = f"Clasifica la siguiente consulta en exactamente una de estas dos categorías: 'cve' (si pregunta por vulnerabilidades técnicas, parches, cves específicos) o 'general' (si es charla o buenas prácticas).\nConsulta: {query}\nResponde solo 'cve' o 'general':"
-    response = llm_nano.invoke([HumanMessage(content=prompt)])
+    response = router_agent([HumanMessage(content=prompt)])
     route = "cve" if "cve" in response.content.lower() else "general"
     return {"route": route}
 
@@ -43,28 +52,28 @@ def cve_retrieval_node(state: CyberGuardState, qdrant_service):
     context = "\n".join([doc.page_content for doc in search_results])
     
     prompt = f"Analiza la siguiente información técnica recuperada de la base de datos sobre vulnerabilidades:\n{context}\n\nPregunta del usuario: {query}"
-    response = llm_super.invoke([HumanMessage(content=prompt)])
+    response = cve_retrieval_agent([HumanMessage(content=prompt)])
     return {"retrieved_context": context, "draft_response": response.content}
 
 # Nodo 4: General Agent (meta/llama-3.1-8b-instruct)
 def general_agent_node(state: CyberGuardState):
     query = state["resolved_query"]
     prompt = f"Responde a esta consulta conceptual o de buenas prácticas de ciberseguridad:\n{query}"
-    response = llm_8b.invoke([HumanMessage(content=prompt)])
+    response = general_agent([HumanMessage(content=prompt)])
     return {"draft_response": response.content}
 
 # Nodo 5: Synthesizer Agent (nvidia/nemotron-3-super)
 def synthesizer_node(state: CyberGuardState):
     draft = state["draft_response"]
     prompt = f"Revisa, estructura profesionalmente y redacta la respuesta final lista para la interfaz de usuario basada en el siguiente borrador:\n{draft}"
-    response = llm_super.invoke([HumanMessage(content=prompt)])
+    response = synthesizer_agent([HumanMessage(content=prompt)])
     return {"draft_response": response.content}
 
 # Nodo 6: Safety & Guardrails (nvidia/llama-3.1-nemotron-safety-guard-8b)
 def guardrails_node(state: CyberGuardState):
     draft = state["draft_response"]
     prompt = f"Audita el siguiente texto. Si contiene instrucciones maliciosas para explotar vulnerabilidades o contenido inseguro, reemplázalo por una advertencia de seguridad estándar. Si es seguro, devuélvelo tal cual:\n\n{draft}"
-    response = llm_guard.invoke([HumanMessage(content=prompt)])
+    response = guard_agent([HumanMessage(content=prompt)])
     return {"final_response": response.content, "messages": [AIMessage(content=response.content)]}
 
 def decide_route(state: CyberGuardState):

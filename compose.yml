@@ -18,7 +18,24 @@ services:
         condition: service_started
     networks:
       - cyberguard_net
-    command: watchfiles "uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # --- CONFIGURACIÓN DE DOCKER COMPOSE WATCH ---
+    develop:
+      watch:
+        # Sincroniza los cambios de código fuente en tiempo real
+        - action: sync
+          path: ./backend
+          target: /app
+          ignore:
+            - __pycache__/
+            - "*.pyc"
+            - .git/
+        # Si cambias las dependencias, reconstruye la imagen automáticamente
+        - action: rebuild
+          path: ./backend/requirements.txt
   # --- Frontend UI (React + Vite served by Nginx) ---
   frontend:
     build:
@@ -34,6 +51,17 @@ services:
       - CHOKIDAR_USEPOLLING=true  # Útil si estás en Windows/Mac para que Docker detecte los cambios de archivos
       - VITE_API_URL=http://localhost:8000
     command: npm run dev -- --host 0.0.0.0
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend
+          target: /app
+          ignore:
+            - node_modules/
+            - dist/
+            - .git/
+        - action: rebuild
+          path: ./frontend/package.json
   # --- Base de Datos NoSQL (MongoDB) ---
   mongo:
     image: mongo:7.0
