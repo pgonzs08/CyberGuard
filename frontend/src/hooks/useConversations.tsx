@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import { createConversation, sendMessage} from '../services/conversationsService';
-import type {Conversation} from '../services/conversationsService';
+import { createConversation, sendMessage, getConversations, getConversation} from '../services/conversationsService';
+import type {ConversationSummary, Conversation} from '../services/conversationsService';
 
-export function useConversations(initialConversations: Conversation[]) {
-  const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
+export function useConversations(initialConversations: ConversationSummary[]) {
+  const [conversations, setConversations] = useState<ConversationSummary[]>(initialConversations);
   const [activeId, setActiveId] = useState<string>(initialConversations[0]?.id || '');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const activeConversation = conversations.find(c => c.id === activeId) || conversations[0];
+  getConversations().then((value) => setConversations(value))
+
+  const activeConversation;
+  getConversation(activeId).then((value) => activeConversation = value;)
 
   // Enviar mensaje utilizando el servicio
   const handleSendMessage = async (text: string) => {

@@ -14,18 +14,17 @@ interface Message {
   content: string;
 }
 
-interface Conversation {
+interface ConversationSummary {
   id: string;
   name: string;
-  owner: string;
   creation_date: string;
-  content: Message[];
+  last_msg: Message | null;
 }
 
 interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
-  conversations: Conversation[];
+  conversations: ConversationSummary[];
   activeId: string;
   onSelectConversation: (id: string) => void;
   onNewConversation: () => void;
@@ -90,7 +89,7 @@ export default function Sidebar({
     <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1 min-w-[320px] custom-scrollbar">
       {conversations.map(conv => {
         const isActive = conv.id === activeId;
-        const lastMsg = conv.content[conv.content.length - 1]?.content || 'Sin mensajes aún...';
+        const lastMsg = conv.last_msg?.content || 'Sin mensajes aún...';
         
         return (
           <button

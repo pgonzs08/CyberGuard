@@ -78,6 +78,12 @@ A continuación se documentan los endpoints principales de la API REST del backe
 
 ### 5.1. Gestión de Conversaciones
 
+#### Obtener un listado de conversaciones
+
+* **Ruta:** `POST /api/conversaciones`
+* **Descripción:** Devuelve un listado de todas las conversaciones.
+* **Payload Request (JSON):**
+
 #### Crear una nueva conversación
 
 * **Ruta:** `POST /api/conversaciones`
@@ -86,8 +92,6 @@ A continuación se documentan los endpoints principales de la API REST del backe
 
 ```json
 {
-  "usuario_id": "usr_981273",
-  "titulo": "Consulta sobre vulnerabilidad Apache"
 }
 
 ```
@@ -95,10 +99,20 @@ A continuación se documentan los endpoints principales de la API REST del backe
 * **Respuesta Exitosa (`201 Created`):**
 
 ```json
-{
-  "conversacion_id": "conv_67a8b9c1",
-  "creation_date": "2026-10-12T10:00:00Z",
-  "estado": "activo"
+{ 
+  "conversaciones":[
+    {
+      "conversacion_id": "conv_67a8b9c1",
+      "creation_date": "2026-10-12T10:00:00Z",
+      "estado": "activo"        
+    },
+    {
+      "conversacion_id": "conv_67a8b9c2",
+      "creation_date": "2026-10-12T11:00:00Z",
+      "estado": "activo"        
+    },
+    ...
+  ]
 }
 
 ```

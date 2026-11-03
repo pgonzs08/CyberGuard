@@ -6,6 +6,13 @@ export interface Message {
   content: string;
 }
 
+export interface ConversationSummary {
+  id: string;
+  name: string;
+  creation_date: string;
+  last_msg: Message | null;
+}
+
 export interface Conversation {
   id: string;
   name: string;
@@ -16,6 +23,27 @@ export interface Conversation {
 
 // URL base de tu backend FastAPI
 const API_BASE_URL = 'http://localhost:8000/api';
+
+export async function getConversations(): Promise<ConversationSummary[]> {
+  try{
+    const response = await fetch(`${API_BASE_URL}/conversaciones/`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (response.status!==200){
+      throw new Error(`Error al recuperar conversaciones. Código HTTP: ${response.status}`)
+    }
+    const data = await response.json();
+    return data
+  }
+  catch (error) {
+    console.error("No se pudieron obtener las conversaciones del backend");
+    return [{"name": "None", "id": "None", creation_date:"None", "last_msg": null}];
+  }
+}
 
 /**
  * Crea una nueva conversación en el backend.
@@ -88,12 +116,40 @@ export async function sendMessage(msg: string, conversation_id: string): Promise
   } catch (error) {
     console.error('Error en sendMessage:', error);
     
-    // Modo simulación inteligente de respaldo para desarrollo local fluido
     return {
       id: 'msg_bot_' + Date.now(),
       role: 'assistant',
       timetag: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      content: `[Simulación FastAPI] Recibí tu mensaje: "${msg}". Todo funciona correctamente en el frontend.`
+      content: `El backend no pudo recibir tu mensaje: "${msg}". Prueba más tarde.`
     };
   }
+}
+
+export async function getConversation(conversation_id: string): Promise<Conversation>{
+  try {
+    const response = await fetch(`${API_BASE_URL}/conversaciones/${conversation_id}/`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+
+    if (!response.ok){
+      throw new Error(`Error al recuperar conversación. Código HTTP: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+  catch (error){
+    console.error('Error en sendMessage:', error);
+
+    return {
+      "id": "None",
+      "name": "None",
+      "content": [],
+      "owner": "None",
+      "creation_date": "None"
+    }
+  }
+
 }
