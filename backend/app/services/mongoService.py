@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from motor.motor_asyncio import AsyncIOMotorClient
-from app.core.dal.conversation import ConversationDAL, Conversation, MessageEntry
+from app.core.dal.conversation import ConversationDAL, Conversation, MessageEntry, Message, ConversationSummary
 from app.core.settings import MONGO_URI
 
 class MongoService:
@@ -13,6 +13,18 @@ class MongoService:
         
         # Inicializa la capa de acceso a datos de conversaciones
         self._conversation_dal = ConversationDAL(self._db.get_collection("conversations"))
+
+    async def get_conversations(self):
+        return await self._conversation_dal.list_conversations()
+
+
+    async def get_conversation_history(self, conversation_id: str, limit: int) -> Conversation | None:
+
+        conversation = await self._conversation_dal.get_conversation(conversation_id)
+
+        conversation.content = conversation.content[-limit:]
+
+        return conversation
 
     async def create_conversation(self, owner:str, conversation_name:str)-> str:
 

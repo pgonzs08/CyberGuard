@@ -118,7 +118,8 @@ class ConversationDAL:
         """
         Devuelve el resumen de todas las conversaciones
         """
-        async for doc in self._collection.find(
+
+        cursor = self._collection.find(
             {},
             projection={
                 "name": 1,
@@ -128,9 +129,11 @@ class ConversationDAL:
             },
             sort={"creation_date": 1},
             session=session
-        ):
-            # Corregido: Llamaba a .from_doc() que no existía en el modelo original
-            yield ConversationSummary.from_doc(doc) if doc else doc
+        )
+        docs = await cursor.to_list(length=50)
+
+        return [ConversationSummary.from_doc(doc) for doc in docs if doc]
+        
 
     async def create_conversation(self, owner: str | ObjectId, name: str, session=None) -> str:
         # Aseguramos que guardamos un ObjectId real en la base de datos de Mongo para indexación eficiente

@@ -9,11 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException, Path, status
 from pydantic import BaseModel, Field
 
 from app.services.chatService import ChatService
-from app.services.qdrantService import get_qdrant_service
-from app.services.mongoService import get_mongo_service
+from app.services.qdrantService import get_qdrant_service, QdrantService
+from app.services.mongoService import get_mongo_service, MongoService
 
-class MessageBase(BaseModel):
-    contenido: str = Field(..., example="¿Cómo funciona el stack FARM?")
+from app.core.dal.conversation import Message, MessageEntry, Conversation, ConversationSummary
 
 class MessageAnswer(BaseModel):
     id: str
@@ -38,11 +37,21 @@ class HistorialResponse(BaseModel):
     conversacion_id: str
     historial: list[MessageAnswer]
 
+class ListConversations(BaseModel):
+    conversations: list[ConversationSummary]
+
 router = APIRouter(tags=["Chatbot"])
 
 # Fábrica para instanciar el servicio inyectando Qdrant (y opcionalmente MongoDB)
 def get_chat_service(qdrant_service = Depends(get_qdrant_service), mongo_service=Depends(get_mongo_service)) -> ChatService:
     return ChatService(qdrant_service=qdrant_service, mongo_db=mongo_service)
+
+@router.get("/", response_model=ListConversations)
+async def listar_conversaciones(mongo_service: MongoService = Depends(get_mongo_service)):
+
+    conversaciones = await mongo_service.get_conversations()
+
+    return ListConversations(conversaciones = conversaciones)
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def iniciar_conversacion(chat_service: ChatService = Depends(get_chat_service)):
@@ -52,7 +61,7 @@ async def iniciar_conversacion(chat_service: ChatService = Depends(get_chat_serv
     """
     # Aquí llamarías a tu DAL/Repository: 
     conversation_id = await chat_service.create_conversation()
-    return {"conversacion_id": conversation_id, "mensaje": "Sesión de chat iniciada"}
+    return {"id": conversation_id, "mensaje": "Sesión de chat iniciada"}
     
 
 @router.post("/{conversacion_id}", response_model=MessageResponse)
@@ -88,19 +97,11 @@ async def enviar_mensaje_conversacion(
 
 
 @router.get("/{conversacion_id}", response_model=HistorialResponse)
-async def obtener_historial(conversacion_id: str, limite: int | None = 20):
+async def get_conversation(conversacion_id: str, limite: int | None = 20, mongo_service: MongoService=Depends(get_mongo_service)):
     """
     Recupera los últimos mensajes de una conversación específica desde tu DAL.
     Útil para cuando el usuario recarga la página en React.
     """
-    # historial = await ChatRepository.obtener_mensajes(conversacion_id, limite)
+    conversation = await mongo_service.get_conversation_history(conversacion_id, limite)
     
-    historial_simulado = [
-        {"id": "1", "rol": "user", "contenido": "Hola", "creation_date": datetime.now(tz=datetime.utc)},
-        {"id": "2", "rol": "assistant", "contenido": "¿En qué puedo ayudarte?", "creation_date": datetime.now(tz=datetime.utc)}
-    ]
-    
-    return {
-        "conversacion_id": conversacion_id,
-        "historial": historial_simulado
-    }
+    return conversation

@@ -9,30 +9,65 @@ import {
   Loader2
 } from 'lucide-react';
 
-interface Message {
+interface ChatMessageProps {
   id: string;
-  role: string;
-  timetag: string;
   content: string;
-}
-
-interface Conversation {
-  id: string;
-  name: string;
-  owner: string;
-  creation_date: string;
-  content: Message[];
+  timetag: string;
+  role: string;
 }
 
 interface ChatWindowProps {
-  conversation: Conversation;
+  name: string;
+  owner: string;
+  conversation: ChatMessageProps[];
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
   onSendMessage: (text: string) => void;
   isLoading?: boolean;
 }
 
+function ChatMessage({
+  id,
+  content,
+  timetag,
+  role,
+}: ChatMessageProps) {
+      const isUser = role === 'user';
+      return(<motion.div 
+          key={id}
+          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ duration: 0.2, type: 'spring', stiffness: 400, damping: 25 }}
+          className={`flex items-end gap-3 max-w-[75%] ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
+        >
+          {/* Icono de Avatar */}
+          <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 shadow-md ${
+            isUser 
+              ? 'bg-[var(--color-primary-500)] text-white shadow-[var(--color-primary-500)]/20' 
+              : 'bg-[var(--color-surface-card)] text-[var(--color-text-muted)] border border-[var(--color-border-subtle)]'
+          }`}>
+            {isUser ? <User className="h-4 w-4" /> : <Sparkles className="h-4 w-4 text-[var(--color-primary-500)]" />}
+          </div>
+
+          {/* Burbuja de Contenido */}
+          <div className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
+            isUser 
+              ? 'bg-[var(--color-primary-500)] text-white rounded-br-none shadow-[var(--color-primary-500)]/10' 
+              : 'bg-[var(--color-surface-card)] border border-[var(--color-border-subtle)] text-[var(--color-text-main)] rounded-bl-none backdrop-blur-md'
+          }`}>
+            <p className="whitespace-pre-wrap">{content}</p>
+            <span className={`text-[10px] block mt-1.5 text-right ${isUser ? 'text-[var(--color-primary-100)]' : 'text-[var(--color-text-muted)]'}`}>
+              {timetag}
+            </span>
+          </div>
+        </motion.div>
+      );
+    }
+
 export default function ChatWindow({
+  name,
+  owner,
   conversation,
   isSidebarOpen,
   onToggleSidebar,
@@ -66,11 +101,11 @@ export default function ChatWindow({
         )}
         <div>
           <h2 className="text-sm font-semibold text-[var(--color-text-main)]">
-            {conversation?.name || 'Selecciona un chat'}
+            {name || 'Selecciona un chat'}
           </h2>
           <span className="text-xs text-[var(--color-success)] flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)] animate-pulse" />
-            Dueño: {conversation?.owner || 'N/A'} | FastAPI Conectado
+            Dueño: {owner || 'N/A'} | FastAPI Conectado
           </span>
         </div>
       </div>
@@ -85,40 +120,7 @@ export default function ChatWindow({
     {/* -------------------- LISTA DE MENSAJES (De arriba a abajo) -------------------- */}
     <div className="flex-1 overflow-y-auto p-6 space-y-6 flex flex-col custom-scrollbar">
       <AnimatePresence mode="popLayout">
-        {conversation?.content?.map((msg) => {
-          const isUser = msg.role === 'user';
-          return (
-            <motion.div 
-              key={msg.id}
-              initial={{ opacity: 0, y: 10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2, type: 'spring', stiffness: 400, damping: 25 }}
-              className={`flex items-end gap-3 max-w-[75%] ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
-            >
-              {/* Icono de Avatar */}
-              <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 shadow-md ${
-                isUser 
-                  ? 'bg-[var(--color-primary-500)] text-white shadow-[var(--color-primary-500)]/20' 
-                  : 'bg-[var(--color-surface-card)] text-[var(--color-text-muted)] border border-[var(--color-border-subtle)]'
-              }`}>
-                {isUser ? <User className="h-4 w-4" /> : <Sparkles className="h-4 w-4 text-[var(--color-primary-500)]" />}
-              </div>
-
-              {/* Burbuja de Contenido */}
-              <div className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
-                isUser 
-                  ? 'bg-[var(--color-primary-500)] text-white rounded-br-none shadow-[var(--color-primary-500)]/10' 
-                  : 'bg-[var(--color-surface-card)] border border-[var(--color-border-subtle)] text-[var(--color-text-main)] rounded-bl-none backdrop-blur-md'
-              }`}>
-                <p className="whitespace-pre-wrap">{msg.content}</p>
-                <span className={`text-[10px] block mt-1.5 text-right ${isUser ? 'text-[var(--color-primary-100)]' : 'text-[var(--color-text-muted)]'}`}>
-                  {msg.timetag}
-                </span>
-              </div>
-            </motion.div>
-          );
-        })}
+        {conversation?.map((props) => ChatMessage(props))}
       </AnimatePresence>
 
       {/* Indicador de carga si el bot está respondiendo */}

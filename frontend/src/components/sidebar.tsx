@@ -6,36 +6,59 @@ import {
   Sparkles 
 } from 'lucide-react';
 
-// Reutilizamos la misma estructura de tipos basada en Pydantic
-interface Message {
-  id: string;
-  role: string;
-  timetag: string;
-  content: string;
-}
 
-interface ConversationSummary {
-  id: string;
-  name: string;
-  creation_date: string;
-  last_msg: Message | null;
+interface SidebarConvSummaryProps {
+  id: string,
+  isActive: boolean,
+  name: string,
+  creation_date: string,
+  lastMessage: string,
+  onSelectConversation: (id: string) => void;
 }
 
 interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
-  conversations: ConversationSummary[];
-  activeId: string;
+  conversations: SidebarConvSummaryProps[];
   onSelectConversation: (id: string) => void;
   onNewConversation: () => void;
 }
+
+function SidebarConvSummary(
+  {
+    id,
+    isActive,
+    name,
+    creation_date,
+    lastMessage,
+    onSelectConversation
+  }: SidebarConvSummaryProps
+) {
+    return (
+      <button
+        key={id}
+        onClick={() => onSelectConversation(id)}
+        className={`w-full text-left p-3 rounded-xl transition-all flex flex-col gap-1 relative group ${
+          isActive 
+            ? 'bg-[var(--color-primary-500)]/10 border border-[var(--color-primary-500)]/30 text-[var(--color-text-main)]' 
+            : 'hover:bg-[var(--color-border-subtle)]/40 text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] border border-transparent'
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <span className={`text-sm font-medium truncate ${isActive ? 'text-[var(--color-primary-500)]' : 'text-[var(--color-text-main)]'}`}>
+            {name}
+          </span>
+          <span className="text-[10px] text-[var(--color-text-muted)]">{creation_date}</span>
+        </div>
+        <p className="text-xs text-[var(--color-text-muted)] truncate pr-4">{lastMessage}</p>
+      </button>
+    );
+  }
 
 export default function Sidebar({
   isOpen,
   onToggle,
   conversations,
-  activeId,
-  onSelectConversation,
   onNewConversation
 }: SidebarProps) {
   return (
@@ -87,30 +110,7 @@ export default function Sidebar({
 
     {/* Lista de Conversaciones */}
     <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1 min-w-[320px] custom-scrollbar">
-      {conversations.map(conv => {
-        const isActive = conv.id === activeId;
-        const lastMsg = conv.last_msg?.content || 'Sin mensajes aún...';
-        
-        return (
-          <button
-            key={conv.id}
-            onClick={() => onSelectConversation(conv.id)}
-            className={`w-full text-left p-3 rounded-xl transition-all flex flex-col gap-1 relative group ${
-              isActive 
-                ? 'bg-[var(--color-primary-500)]/10 border border-[var(--color-primary-500)]/30 text-[var(--color-text-main)]' 
-                : 'hover:bg-[var(--color-border-subtle)]/40 text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] border border-transparent'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className={`text-sm font-medium truncate ${isActive ? 'text-[var(--color-primary-500)]' : 'text-[var(--color-text-main)]'}`}>
-                {conv.name}
-              </span>
-              <span className="text-[10px] text-[var(--color-text-muted)]">{conv.creation_date}</span>
-            </div>
-            <p className="text-xs text-[var(--color-text-muted)] truncate pr-4">{lastMsg}</p>
-          </button>
-        );
-      })}
+      {conversations.map(conv => { return SidebarConvSummary(conv)})}
     </div>
   </motion.aside>
 )};

@@ -1,16 +1,15 @@
 import { useState } from 'react';
 import { createConversation, sendMessage, getConversations, getConversation} from '../services/conversationsService';
-import type {ConversationSummary, Conversation} from '../services/conversationsService';
+import type {Conversation, ConversationSummary} from '../model/datamodel';
 
 export function useConversations(initialConversations: ConversationSummary[]) {
   const [conversations, setConversations] = useState<ConversationSummary[]>(initialConversations);
   const [activeId, setActiveId] = useState<string>(initialConversations[0]?.id || '');
   const [isLoading, setIsLoading] = useState<boolean>(true);
-
+  const [activeConversation, setActiveConversation] = useState<Conversation|null>(null);
   getConversations().then((value) => setConversations(value))
 
-  const activeConversation;
-  getConversation(activeId).then((value) => activeConversation = value;)
+  getConversation(activeId).then((value) => setActiveConversation(value));
 
   // Enviar mensaje utilizando el servicio
   const handleSendMessage = async (text: string) => {
@@ -25,15 +24,13 @@ export function useConversations(initialConversations: ConversationSummary[]) {
     };
 
     // 1. Actualización optimista en el cliente
-    setConversations(prev => prev.map(conv => 
-      conv.id === activeId ? { ...conv, content: [...conv.content, userMessage] } : conv
-    ));
+    activeConversation?.content.push(userMessage);
 
     setIsLoading(true);
 
     try {
       // 2. Llamada al servicio de FastAPI
-      const botResponse = await sendMessage(text, activeId);
+      const botResponse = await sendMessage(userMessage, activeId);
 
       // 3. Añadir la respuesta del bot
       setConversations(prev => prev.map(conv => 
@@ -50,12 +47,11 @@ export function useConversations(initialConversations: ConversationSummary[]) {
   const handleNewConversation = async () => {
     const res = await createConversation('user_123', 'Nueva Conversación');
     
-    const newConv: Conversation = {
+    const newConv: ConversationSummary = {
       id: res.conversacion_id,
       name: 'Nueva Conversación',
-      owner: 'user_123',
       creation_date: new Date().toISOString().split('T')[0],
-      content: []
+      last_msg: null
     };
 
     setConversations(prev => [newConv, ...prev]);
