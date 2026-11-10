@@ -1,5 +1,5 @@
 from langchain_core.messages import HumanMessage, AIMessage
-from app.services.mas.graph import build_cyberguard_graph
+from app.services.mas.graph import build_cyberguard_graph, build_simple_graph
 from app.services.mongoService import MongoService
 from app.services.qdrantService import QdrantService
 
@@ -8,6 +8,7 @@ class ChatService:
         self._qdrant_service = qdrant_service
         self._mongo_db = mongo_db # Para guardar/cargar historial en MongoDB
         self._graph = build_cyberguard_graph(qdrant_service)
+        self._cgraph = build_simple_graph()
 
     async def create_conversation(self, conversation_name: str = "test") -> str:
         conversation_id = await self._mongo_db.create_conversation(owner="pgonzs", conversation_name=conversation_name)
@@ -34,15 +35,22 @@ class ChatService:
             "draft_response": "",
             "final_response": ""
         }
-
-        # 3. Ejecutar el flujo agéntico de LangGraph
-        result = await self._graph.ainvoke(initial_state)
+        try:
+            # Flujo de CyberGuard
+            result = await self._graph.ainvoke(initial_state)
+        
+        except Exception as e:
+            # Intenta flujo conversacional
+            print(e)
+            for tb in e.__traceback__:
+                print(tb)
+            result = await self._cgraph.ainvoke(initial_state)
 
         response_text = result.get("final_response", "No se pudo generar respuesta.")
         route_taken = result.get("route", "unknown")
 
         if self._mongo_db:
-            self._mongo_db.add_message(conversation_id=conversation_id, message=response_text, role="ai")
+            await self._mongo_db.add_message(conversation_id=conversation_id, message=response_text, role="ai")
 
         return {
             "response": response_text,

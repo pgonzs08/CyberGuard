@@ -8,6 +8,7 @@ services:
     ports:
       - "8000:8000"
     environment:
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
       - MONGO_URI=mongodb://mongo:27017/cyberguard
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
@@ -33,9 +34,15 @@ services:
             - __pycache__/
             - "*.pyc"
             - .git/
-        # Si cambias las dependencias, reconstruye la imagen automáticamente
+            - .venv/
+            - "*.egg-info/"
+        # Si cambian las dependencias, reconstruye la imagen automáticamente
         - action: rebuild
           path: ./backend/requirements.txt
+        # Si cambia el propio Dockerfile, reconstruye también
+        - action: rebuild
+          path: ./backend/Dockerfile
+
   # --- Frontend UI (React + Vite served by Nginx) ---
   frontend:
     build:
@@ -60,8 +67,14 @@ services:
             - node_modules/
             - dist/
             - .git/
+            - .vite/
         - action: rebuild
           path: ./frontend/package.json
+        - action: rebuild
+          path: ./frontend/package-lock.json
+        - action: rebuild
+          path: ./frontend/Dockerfile.dev
+
   # --- Base de Datos NoSQL (MongoDB) ---
   mongo:
     image: mongo:7.0
@@ -70,7 +83,6 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
-    
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 5s
