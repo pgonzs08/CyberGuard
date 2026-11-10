@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI
-#from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.api_router import router as api_router
 import app.core.settings as settings
@@ -41,8 +41,6 @@ async def root():
 #Incluir los routers a servicios
 app.include_router(api_router, prefix="/api")
 
-"""
-# Configurar orígenes permitidos
 origins = [
     "http://localhost:5173",  # Vite Dev Server
     "http://localhost:80",    # Nginx
@@ -55,7 +53,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-"""
+
 def main(argv=sys.argv[1:]):
     try:
         uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=DEBUG)

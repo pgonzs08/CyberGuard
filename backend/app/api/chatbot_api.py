@@ -16,9 +16,9 @@ from app.core.dal.conversation import Message, MessageEntry, Conversation, Conve
 
 class MessageAnswer(BaseModel):
     id: str
-    rol: str = Field(..., example="assistant")  # "user" o "assistant"
-    contenido: str
-    creation_date: datetime
+    role: str = Field(..., example="assistant")  # "user" o "assistant"
+    content: str
+    timetag: datetime
 
 class MessageRequest(BaseModel):
     content: str
@@ -51,7 +51,7 @@ async def listar_conversaciones(mongo_service: MongoService = Depends(get_mongo_
 
     conversaciones = await mongo_service.get_conversations()
 
-    return ListConversations(conversaciones = conversaciones)
+    return ListConversations(conversations = conversaciones)
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def iniciar_conversacion(chat_service: ChatService = Depends(get_chat_service)):
@@ -63,38 +63,29 @@ async def iniciar_conversacion(chat_service: ChatService = Depends(get_chat_serv
     conversation_id = await chat_service.create_conversation()
     return {"id": conversation_id, "mensaje": "Sesión de chat iniciada"}
     
-
 @router.post("/{conversacion_id}", response_model=MessageResponse)
 async def enviar_mensaje_conversacion(
+    payload: MessageRequest,
     conversacion_id: str = Path(..., description="ID único de la conversación"),
-    payload: MessageRequest = None,
-    chat_service: ChatService = Depends(get_chat_service)
+    chat_service: ChatService = Depends(get_chat_service),
 ):
     try:
-
-        # 1. Procesar el mensaje a través del flujo agéntico de LangGraph
         result = await chat_service.process_message(
             message=payload.content,
-            conversation_id=conversacion_id
+            conversation_id=conversacion_id,
         )
-        
-        respuesta_texto = result["response"]
-
-        # 2. Generar metadatos de respuesta exigidos
-        mensaje_id = f"msg_{uuid.uuid4().hex[:8]}"
-        timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
         return MessageResponse(
-            mensaje_id=mensaje_id,
             conversacion_id=conversacion_id,
-            respuesta_agente=respuesta_texto,
-            timestamp=timestamp
+            respuesta_agente=MessageAnswer(
+                id=f"msg_{uuid.uuid4().hex[:8]}",
+                role="assistant",
+                content=result["response"],
+                timetag=datetime.now(timezone.utc),
+            ),
         )
-
     except Exception as e:
-        print(e)
         raise HTTPException(status_code=500, detail=f"Error al procesar el mensaje en la conversación: {str(e)}")
-
 
 @router.get("/{conversacion_id}", response_model=HistorialResponse)
 async def get_conversation(conversacion_id: str, limite: int | None = 20, mongo_service: MongoService=Depends(get_mongo_service)):
@@ -103,5 +94,7 @@ async def get_conversation(conversacion_id: str, limite: int | None = 20, mongo_
     Útil para cuando el usuario recarga la página en React.
     """
     conversation = await mongo_service.get_conversation_history(conversacion_id, limite)
+
+    historial = [MessageAnswer(id=msg.id, role=msg.role, content=msg.content, timetag=msg.timetag) for msg in conversation.content]
     
-    return conversation
+    return HistorialResponse(conversacion_id=conversation.id, historial=historial)
