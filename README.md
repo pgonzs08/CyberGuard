@@ -54,23 +54,34 @@ graph TD
         UI[React Frontend SPA]
     end
 
-    subgraph Cloud [Infraestructura Cloud / Docker Stack]
+    subgraph Backend [Infraestructura Cloud / Docker Stack]
         Gateway[API Gateway / Ingress]
         API[FastAPI Backend Multi-Agente]
-        Mongo[(MongoDB - Historial de Conversaciones)]
-        Qdrant[(QDrant - Base de Datos Vectorial CVEs & MITRE)]
     end
+
+    subgraph DataLayer[Capa de datos distribuídos en la nube]
+          Mongo[(MongoDB - Historial de Conversaciones)]
+
+      subgraph QDrant [Microservicio QDrant]
+          QHandler[QdrantHandler]
+          Qdrant[(QDrant - Base de Datos Vectorial CVEs & MITRE)]
+      end
+    end
+
+    NVIDIA[Endpoints de LLMs en NVIDIA NIM]
 
     UI -->|HTTPS / JSON REST| Gateway
     Gateway -->|Enrutamiento HTTP| API
+    API -->|Motores de Inferencia| NVIDIA
     API -->|Persistencia de Sesión| Mongo
-    API -->|Búsqueda Semántica de Vectores| Qdrant
+    API -->|Búsqueda Semántica de Vectores| QHandler
+    QHandler --> Qdrant
 
 ```
 
 ---
 
-## 5. Especificación de API REST
+## 5. Especificación de API REST Backend
 
 A continuación se documentan los endpoints principales de la API REST del backend de CyberGuard, agrupados por dominios funcionales y similitud de proceso (gestión de conversaciones, marco MITRE, base de conocimiento CVEs y generación de reportes).
 
@@ -472,3 +483,196 @@ Para optimizar al máximo el presupuesto limitado de **CyberGuard** sin sacrific
 * **Rol:** Actúa como auditor final de seguridad, revisando el mensaje generado antes de enviarlo para detectar y bloquear posibles *jailbreaks* o instrucciones maliciosas de explotación.
 * **Modelo:** `nvidia/llama-3.1-nemotron-safety-guard-8b`
 * **Por qué se usa:** Es un modelo especializado nativamente en moderación y seguridad. Ofrece un filtrado estricto y rápido con un coste computacional bajo, protegiendo la plataforma de usos indebidos.
+
+## 7. Especificación del microservicio QDrant Handler
+
+### 7.1. Descripción general
+
+El microservicio **QDrant Handler** constituye la capa de gestión, actualización y recuperación de información vectorial de CyberGuard. Su objetivo principal es proporcionar al backend multiagente un mecanismo de acceso eficiente a información contextualizada sobre vulnerabilidades (CVEs) y técnicas y tácticas del framework MITRE ATT&CK mediante búsquedas semánticas.
+
+Este microservicio encapsula toda la lógica relacionada con la base de datos vectorial Qdrant, desacoplando al backend de los mecanismos internos de almacenamiento, generación de embeddings e ingestión de información.
+
+La comunicación entre el backend FastAPI y QDrant Handler se realizará mediante **gRPC**, utilizando Protocol Buffers (Protobuf) para definir los contratos de comunicación y garantizar una interfaz tipada, eficiente y fácilmente extensible.
+
+QDrant Handler se desplegará como un contenedor independiente dentro de la infraestructura Docker, permitiendo su mantenimiento, escalabilidad y evolución de forma desacoplada del resto de componentes del sistema.
+
+### 7.2. Responsabilidades principales
+
+El microservicio QDrant Handler tendrá las siguientes responsabilidades:
+
+**1. Recopilación y actualización de información**
+
+Se encargará de recopilar periódicamente información procedente de fuentes oficiales de ciberseguridad para mantener actualizada la base de conocimiento de CyberGuard.
+
+Entre las principales fuentes de información se contemplan:
+
+- **NVD (National Vulnerability Database):** recopilación de información sobre vulnerabilidades CVE, incluyendo identificadores, descripciones, puntuaciones CVSS, debilidades CWE y referencias asociadas.
+- **MITRE ATT&CK:** recopilación de información sobre técnicas, sub-técnicas, tácticas, procedimientos y demás elementos del framework ATT&CK.
+
+El proceso de actualización deberá contemplar la detección de nuevos registros, modificaciones en documentos existentes y eliminación o desactivación de información obsoleta cuando corresponda.
+
+La ingestión se realizará mediante procesos independientes de las operaciones de consulta, evitando que las tareas de sincronización interfieran con las peticiones de los agentes.
+
+**2. Generación de embeddings mediante NVIDIA NIM**
+
+El microservicio será responsable de transformar los documentos recopilados y las consultas recibidas en representaciones vectoriales mediante los endpoints de embeddings de NVIDIA NIM.
+
+Los embeddings permitirán representar semánticamente la información de vulnerabilidades y técnicas MITRE ATT&CK, posibilitando su recuperación mediante similitud vectorial.
+
+Se garantizará la compatibilidad entre los embeddings generados durante la ingestión y los utilizados posteriormente en las consultas, manteniendo la coherencia del modelo, la dimensión y el espacio vectorial de representación.
+
+**3. Gestión de la base de datos vectorial Qdrant**
+
+QDrant Handler será el único componente de la arquitectura responsable de gestionar directamente las operaciones sobre la base de datos vectorial.
+
+Se utilizarán dos colecciones independientes:
+
+- `cyberguard_cves`: almacenamiento de embeddings y metadatos asociados a vulnerabilidades CVE.
+- `cyberguard_mitre_attack`: almacenamiento de embeddings y metadatos asociados a técnicas, tácticas y demás elementos de MITRE ATT&CK.
+
+Cada colección permitirá gestionar independientemente sus procesos de ingestión, actualización y recuperación de información.
+
+**4. Recuperación semántica de información**
+
+El microservicio expondrá operaciones de búsqueda semántica para que los agentes del backend puedan recuperar documentos relevantes a partir de consultas expresadas en lenguaje natural.
+
+El procedimiento de recuperación seguirá las siguientes etapas:
+
+1. Recepción de la consulta mediante una petición gRPC.
+2. Generación del embedding de la consulta mediante NVIDIA NIM.
+3. Selección de la colección correspondiente según el tipo de información solicitada.
+4. Ejecución de una búsqueda vectorial en Qdrant.
+5. Recuperación de los documentos más similares junto con sus metadatos y puntuaciones de similitud.
+6. Devolución de los resultados al backend mediante una respuesta gRPC estructurada.
+
+El número máximo de documentos recuperados podrá configurarse mediante un parámetro `limit`, permitiendo adaptar la recuperación a las necesidades de cada agente.
+
+### 7.3. Interfaz de comunicación
+
+La comunicación entre el backend FastAPI y QDrant Handler se implementará mediante **gRPC sobre HTTP/2**, utilizando Protocol Buffers para definir los mensajes y servicios disponibles.
+
+La interfaz proporcionará, como mínimo, las siguientes operaciones:
+
+| Operación | Descripción |
+|---|---|
+| `SearchCVEs` | Recuperación semántica de vulnerabilidades CVE. |
+| `SearchMITRE` | Recuperación semántica de técnicas y tácticas MITRE ATT&CK. |
+| `IngestDocuments` | Incorporación y actualización de documentos en las colecciones correspondientes. |
+| `HealthCheck` | Comprobación del estado y disponibilidad del microservicio. |
+
+Las operaciones de ingestión podrán restringirse a los procesos internos de administración, evitando que los agentes de consulta modifiquen directamente la base de conocimiento.
+
+La interfaz gRPC permitirá mantener desacoplados ambos componentes y facilitará futuras ampliaciones de las operaciones disponibles sin modificar la lógica interna del backend.
+
+### 7.4. Arquitectura interna
+
+El microservicio estará organizado en módulos independientes, siguiendo una separación de responsabilidades:
+
+- **QdrantHandler:** componente principal encargado de coordinar las operaciones de recuperación y almacenamiento vectorial.
+- **EmbeddingService:** responsable de comunicarse con NVIDIA NIM para generar los embeddings de documentos y consultas.
+- **IngestionService:** encargado de recopilar, procesar, normalizar y actualizar la información procedente de las fuentes oficiales.
+- **UpdateWorker:** responsable de ejecutar los procesos periódicos de sincronización de las colecciones.
+- **GRPCServer:** encargado de exponer las operaciones del microservicio y gestionar las comunicaciones con el backend.
+
+Esta organización permitirá modificar individualmente los mecanismos de ingestión, generación de embeddings y recuperación sin afectar al resto de componentes.
+
+### 7.5. Persistencia y sincronización de información
+
+La base de datos Qdrant actuará como sistema de almacenamiento vectorial especializado en la recuperación semántica de información.
+
+Los documentos almacenados incluirán sus correspondientes embeddings y metadatos, permitiendo identificar el origen, tipo y contenido asociado a cada vector.
+
+**Estrategia de actualización incremental e idempotencia**
+
+Para evitar duplicidades y optimizar los procesos de sincronización, se implementará una estrategia de actualización incremental basada en los identificadores originales de los registros de las fuentes oficiales.
+
+Cada documento dispondrá de un identificador estable derivado de su identificador de origen. Por ejemplo, se utilizarán los identificadores CVE para las vulnerabilidades y los identificadores STIX para los objetos de MITRE ATT&CK.
+
+La incorporación y actualización de documentos se realizará mediante operaciones `upsert` de Qdrant, garantizando que la ejecución repetida de un mismo proceso de ingestión no genere registros duplicados.
+
+El proceso de sincronización seguirá las siguientes etapas:
+
+1. Consulta de las fuentes oficiales para identificar nuevos registros y modificaciones.
+2. Comparación de los registros obtenidos con el estado de la última sincronización.
+3. Identificación de los documentos nuevos, modificados y obsoletos.
+4. Generación de embeddings exclusivamente para los documentos nuevos o cuyo contenido relevante haya cambiado.
+5. Incorporación o actualización de los vectores mediante operaciones `upsert`.
+6. Gestión de registros obsoletos mediante eliminación o desactivación controlada, según las características de cada fuente.
+7. Actualización del estado de sincronización y registro de los resultados del proceso.
+
+Para detectar modificaciones se podrán utilizar marcas temporales de actualización y hashes del contenido normalizado de los documentos.
+
+Esta estrategia permitirá reducir las llamadas a NVIDIA NIM, minimizar las operaciones de escritura en Qdrant y optimizar el tiempo necesario para mantener actualizada la base de conocimiento.
+
+**Disponibilidad durante los procesos de ingestión**
+
+Los procesos de actualización se ejecutarán de manera independiente de las operaciones de consulta, evitando bloquear el servicio de recuperación semántica durante la sincronización de las colecciones.
+
+Se priorizará la actualización incremental de los registros, de manera que las búsquedas puedan continuar operando sobre los vectores existentes mientras se incorporan nuevos documentos o se actualizan los modificados.
+
+En aquellos escenarios que requieran reconstrucciones completas o cambios incompatibles en el modelo de embeddings, se podrá implementar una estrategia de reconstrucción mediante colecciones temporales y posterior sustitución controlada de la colección activa.
+
+De esta manera, se evitará dejar indisponible el servicio de recuperación durante operaciones de mantenimiento o migraciones de los datos vectoriales.
+
+La sincronización deberá garantizar:
+
+- Identificación de registros nuevos y modificados.
+- Identificadores estables para evitar duplicidades.
+- Actualización idempotente mediante operaciones `upsert`.
+- Generación selectiva de embeddings.
+- Conservación de la correspondencia entre identificadores de origen y puntos almacenados en Qdrant.
+- Gestión controlada de registros obsoletos.
+- Registro de la fecha y el resultado de cada sincronización.
+- Recuperación ante errores y reintentos de operaciones fallidas.
+- Disponibilidad del servicio de búsqueda durante los procesos de actualización.
+
+### 7.6. Monitorización y observabilidad
+
+QDrant Handler incorporará mecanismos de monitorización que permitan supervisar tanto el funcionamiento del microservicio como la calidad y actualidad de la información almacenada.
+
+Se registrarán, como mínimo, las siguientes métricas:
+
+- Número total de documentos almacenados en cada colección.
+- Número de documentos nuevos, modificados y eliminados durante cada sincronización.
+- Fecha y hora de la última actualización satisfactoria de cada colección.
+- Duración de los procesos de ingestión.
+- Número de embeddings generados y errores asociados a NVIDIA NIM.
+- Número de consultas semánticas procesadas.
+- Latencia media de las operaciones de recuperación.
+- Errores de comunicación con Qdrant y NVIDIA NIM.
+
+Asimismo, se implementará un sistema de logging que permita identificar errores durante la recopilación, procesamiento, generación de embeddings y almacenamiento de documentos.
+
+Estos mecanismos facilitarán la detección de problemas de disponibilidad, retrasos en la sincronización y posibles inconsistencias en la base de conocimiento.
+
+### 7.7. Despliegue y aislamiento
+
+QDrant Handler se desplegará como un contenedor Docker independiente, conectado a la red interna de servicios de CyberGuard.
+
+El contenedor dispondrá de:
+
+- Aplicación desarrollada en Python.
+- Servidor gRPC para atender las peticiones del backend.
+- Cliente oficial de Qdrant para interactuar con la base de datos vectorial.
+- Cliente HTTP para consumir los endpoints de NVIDIA NIM.
+- Procesos de ingestión y actualización de información.
+- Configuración mediante variables de entorno.
+
+La base de datos Qdrant dispondrá de almacenamiento persistente mediante volúmenes Docker, garantizando la conservación de las colecciones y sus vectores ante reinicios o recreaciones de los contenedores.
+
+Las credenciales de NVIDIA NIM y los parámetros de conexión se gestionarán mediante variables de entorno, evitando incluir información sensible directamente en el código fuente.
+
+### 7.8. Integración con el backend multiagente
+
+El backend FastAPI no interactuará directamente con la base de datos Qdrant. Todas las operaciones de recuperación semántica se delegarán en QDrant Handler mediante su interfaz gRPC.
+
+De esta manera, los agentes especializados podrán solicitar información contextualizada sin conocer los detalles de implementación de la base de datos vectorial ni del modelo de embeddings utilizado.
+
+Por ejemplo:
+
+- `cve_agent` utilizará `SearchCVEs` para recuperar vulnerabilidades relacionadas semánticamente con una consulta.
+- Los agentes especializados en MITRE ATT&CK utilizarán `SearchMITRE` para recuperar técnicas y tácticas relacionadas con un incidente o comportamiento observado.
+
+Los resultados obtenidos se incorporarán al contexto de los agentes para complementar sus capacidades de razonamiento y generación de respuestas.
+
+**En definitiva, QDrant Handler constituye el componente responsable de mantener y proporcionar la memoria vectorial especializada de CyberGuard, actuando como intermediario entre el backend multiagente, los servicios de generación de embeddings de NVIDIA NIM y la base de datos vectorial Qdrant.**
