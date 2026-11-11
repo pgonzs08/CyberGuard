@@ -94,6 +94,9 @@ async def router_node(state: CyberGuardState):
     query = state["resolved_query"]
     prompt = f"Clasifica la siguiente consulta en exactamente una de estas dos categorías: 'cve' (si pregunta por vulnerabilidades técnicas, parches, cves específicos) o 'general' (si es charla o buenas prácticas).\nConsulta: {query}\nResponde solo 'cve' o 'general':"
     response = await router_agent([HumanMessage(content=prompt)])
+    logger.info(f"CONTENT: {response.content!r}")
+    logger.info(f"METADATA: {response.response_metadata}")
+    logger.info(f"USAGE: {response.usage_metadata}")
     route = "cve" if "cve" in response.content.lower() else "general"
     return {"route": route}
 
