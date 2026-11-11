@@ -1,32 +1,46 @@
+
 services:
-  # --- Backend API (FastAPI + RAG Engine) ---
+
+  # ------------------------------------------
+  # Backend API (FastAPI + RAG Engine)
+  # ------------------------------------------
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+
     container_name: cyberguard_backend
+
     ports:
       - "8000:8000"
+
     environment:
-      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
-      - MONGO_URI=mongodb://mongo:27017/cyberguard
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY}
+      MONGO_URI: mongodb://mongo:27017/cyberguard
+      QDRANT_SERVICE_URL: http://qdrant-service:8080
+
     depends_on:
       mongo:
         condition: service_healthy
-      qdrant:
-        condition: service_started
+
+      qdrant-service:
+        condition: service_healthy
+
     networks:
       - cyberguard_net
+
     dns:
       - 8.8.8.8
       - 1.1.1.1
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    # --- CONFIGURACIÓN DE DOCKER COMPOSE WATCH ---
+
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+
     develop:
       watch:
-        # Sincroniza los cambios de código fuente en tiempo real
         - action: sync
           path: ./backend
           target: /app
@@ -36,28 +50,37 @@ services:
             - .git/
             - .venv/
             - "*.egg-info/"
-        # Si cambian las dependencias, reconstruye la imagen automáticamente
+
         - action: rebuild
           path: ./backend/requirements.txt
-        # Si cambia el propio Dockerfile, reconstruye también
+
         - action: rebuild
           path: ./backend/Dockerfile
 
-  # --- Frontend UI (React + Vite served by Nginx) ---
+
+  # ------------------------------------------
+  # Frontend UI (React + Vite)
+  # ------------------------------------------
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
+
     container_name: cyberguard_frontend
+
     ports:
       - "80:80"
       - "5173:5173"
+
     networks:
       - cyberguard_net
+
     environment:
-      - CHOKIDAR_USEPOLLING=true  # Útil si estás en Windows/Mac para que Docker detecte los cambios de archivos
-      - VITE_API_URL=http://localhost:8000
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_API_URL: http://localhost:8000
+
     command: npm run dev -- --host 0.0.0.0
+
     develop:
       watch:
         - action: sync
@@ -68,45 +91,147 @@ services:
             - dist/
             - .git/
             - .vite/
+
         - action: rebuild
           path: ./frontend/package.json
+
         - action: rebuild
           path: ./frontend/package-lock.json
+
         - action: rebuild
           path: ./frontend/Dockerfile.dev
 
-  # --- Base de Datos NoSQL (MongoDB) ---
+
+  # ------------------------------------------
+  # MongoDB
+  # ------------------------------------------
   mongo:
     image: mongo:7.0
+
     container_name: cyberguard_mongo
+
     ports:
       - "27017:27017"
+
     volumes:
       - mongo_data:/data/db
+
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test:
+        - CMD
+        - mongosh
+        - --eval
+        - db.adminCommand('ping')
+
       interval: 5s
       timeout: 5s
       retries: 5
+
     networks:
       - cyberguard_net
 
-  # --- Base de Datos Vectorial (Qdrant) ---
+
+  # ------------------------------------------
+  # Qdrant Vector Database
+  # ------------------------------------------
   qdrant:
     image: qdrant/qdrant:v1.8.0
+
     container_name: cyberguard_qdrant
+
     ports:
       - "6333:6333"
+
     volumes:
       - qdrant_data:/qdrant/storage
+
     networks:
       - cyberguard_net
 
+
+  # ------------------------------------------
+  # Qdrant Management Microservice
+  # ------------------------------------------
+  qdrant-service:
+    build:
+      context: ./qdrant-service
+      dockerfile: Dockerfile
+
+    container_name: cyberguard_qdrant_service
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      # Conexión interna con la base de datos vectorial
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+
+      # Colecciones independientes
+      QDRANT_CVE_COLLECTION: cyberguard_cves
+      QDRANT_MITRE_COLLECTION: cyberguard_mitre_attack
+
+      # NVIDIA NIM
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY}
+      NVIDIA_EMBEDDING_MODEL: ${NVIDIA_EMBEDDING_MODEL}
+
+      # Configuración de la API
+      SERVICE_HOST: 0.0.0.0
+      SERVICE_PORT: "8080"
+
+    depends_on:
+      qdrant:
+        condition: service_started
+
+    networks:
+      - cyberguard_net
+
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8080
+      --reload
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=3)"
+
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+    develop:
+      watch:
+        - action: sync
+          path: ./qdrant-service/app
+          target: /app/app
+          ignore:
+            - __pycache__/
+            - "*.pyc"
+
+        - action: rebuild
+          path: ./qdrant-service/requirements.txt
+
+        - action: rebuild
+          path: ./qdrant-service/Dockerfile
+
+
+# ------------------------------------------
+# Networks
+# ------------------------------------------
 networks:
   cyberguard_net:
     name: cyberguard_net
     driver: bridge
 
+
+# ------------------------------------------
+# Persistent Volumes
+# ------------------------------------------
 volumes:
   mongo_data:
   qdrant_data:
