@@ -1,18 +1,17 @@
 """
  Este archivo guarda APIs de consulta al al chat de CyberGuard. Estas consultas son creadas mediante el envío y la edicción de mensajes.
 """
-from datetime import datetime, timezone
-import re
 import uuid
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from backend.app.services.chat import ChatService
+from backend.app.services.mongo_service import MongoService, get_mongo_service
+from backend.app.services.qdrant_service import get_qdrant_service
+from fastapi import APIRouter, Depends, Path, status
 from pydantic import BaseModel, Field
 
-from app.services.chatService import ChatService
-from app.services.qdrantService import get_qdrant_service, QdrantService
-from app.services.mongoService import get_mongo_service, MongoService
+from app.core.dal.conversation import ConversationSummary
 
-from app.core.dal.conversation import Message, MessageEntry, Conversation, ConversationSummary
 
 class MessageAnswer(BaseModel):
     id: str
@@ -42,19 +41,25 @@ class ListConversations(BaseModel):
 
 router = APIRouter(tags=["Chatbot"])
 
+qds = Depends(get_qdrant_service)
+ms = Depends(get_mongo_service)
+
+
 # Fábrica para instanciar el servicio inyectando Qdrant (y opcionalmente MongoDB)
-def get_chat_service(qdrant_service = Depends(get_qdrant_service), mongo_service=Depends(get_mongo_service)) -> ChatService:
+def get_chat_service(qdrant_service = qds, mongo_service=ms) -> ChatService:
     return ChatService(qdrant_service=qdrant_service, mongo_db=mongo_service)
 
+cs = Depends(get_chat_service)
+
 @router.get("/", response_model=ListConversations)
-async def listar_conversaciones(mongo_service: MongoService = Depends(get_mongo_service)):
+async def listar_conversaciones(mongo_service: MongoService = ms):
 
     conversaciones = await mongo_service.get_conversations()
 
     return ListConversations(conversations = conversaciones)
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-async def iniciar_conversacion(chat_service: ChatService = Depends(get_chat_service)):
+async def iniciar_conversacion(chat_service: ChatService = cs):
     """
     Crea una nueva sesión de chat única.
     Devuelve el ID de la conversación generado en MongoDB.
@@ -67,28 +72,25 @@ async def iniciar_conversacion(chat_service: ChatService = Depends(get_chat_serv
 async def enviar_mensaje_conversacion(
     payload: MessageRequest,
     conversacion_id: str = Path(..., description="ID único de la conversación"),
-    chat_service: ChatService = Depends(get_chat_service),
+    chat_service: ChatService = cs,
 ):
-    try:
-        result = await chat_service.process_message(
-            message=payload.content,
-            conversation_id=conversacion_id,
-        )
+    result = await chat_service.process_message(
+        message=payload.content,
+        conversation_id=conversacion_id,
+    )
 
-        return MessageResponse(
-            conversacion_id=conversacion_id,
-            respuesta_agente=MessageAnswer(
-                id=f"msg_{uuid.uuid4().hex[:8]}",
-                role="assistant",
-                content=result["response"],
-                timetag=datetime.now(timezone.utc),
-            ),
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al procesar el mensaje en la conversación: {str(e)}")
+    return MessageResponse(
+        conversacion_id=conversacion_id,
+        respuesta_agente=MessageAnswer(
+            id=f"msg_{uuid.uuid4().hex[:8]}",
+            role="assistant",
+            content=result["response"],
+            timetag=datetime.now(UTC),
+        ),
+    )
 
 @router.get("/{conversacion_id}", response_model=HistorialResponse)
-async def get_conversation(conversacion_id: str, limite: int | None = 20, mongo_service: MongoService=Depends(get_mongo_service)):
+async def get_conversation(conversacion_id: str, limite: int | None = 20, mongo_service: MongoService=ms):
     """
     Recupera los últimos mensajes de una conversación específica desde tu DAL.
     Útil para cuando el usuario recarga la página en React.

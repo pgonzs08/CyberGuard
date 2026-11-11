@@ -1,10 +1,11 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from uuid import uuid4
 
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorCollection
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
+
 
 class MessageEntry(BaseModel):
     content: str = Field(..., examples=["How can I make a safe password?"], description="Content of a new message")
@@ -25,7 +26,7 @@ class Message(BaseModel):
         # Aseguramos que timetag sea un objeto datetime si viene como string desde Mongo
         timetag_val = doc["timetag"]
         if isinstance(timetag_val, str):
-            timetag_val = datetime.fromisoformat(timetag_val.replace("Z", "+00:00"))
+            timetag_val = datetime.fromisoformat(timetag_val)
 
         return Message(
             id=str(msg_id),
@@ -39,7 +40,7 @@ class Message(BaseModel):
         return Message(
             id=uuid4().hex,
             role=msg.role,
-            timetag=datetime.now(tz=timezone.utc), # Guardamos como objeto datetime nativo
+            timetag=datetime.now(tz=UTC), # Guardamos como objeto datetime nativo
             content=msg.content
         )
 
@@ -74,7 +75,7 @@ class Conversation(BaseModel):
             id=str(ObjectId()),
             name=name,
             owner=str(owner), # Convertimos a str
-            creation_date=historic[0].timetag.date() if historic else datetime.now(tz=timezone.utc).date(), # Objeto date nativo
+            creation_date=historic[0].timetag.date() if historic else datetime.now(tz=UTC).date(), # Objeto date nativo
             content=historic
         )
 
@@ -143,7 +144,7 @@ class ConversationDAL:
             {
                 "name": name, 
                 "owner": db_owner, 
-                "creation_date": datetime.now(tz=timezone.utc).date().isoformat(),
+                "creation_date": datetime.now(tz=UTC).date().isoformat(),
                 "content": []
             },
             session=session,
@@ -190,7 +191,7 @@ class ConversationDAL:
             {
                 "$set": {
                     "content.$.content": content,
-                    "content.$.timetag": datetime.now(tz=timezone.utc).isoformat()
+                    "content.$.timetag": datetime.now(tz=UTC).isoformat()
                 },
             },
             session=session,

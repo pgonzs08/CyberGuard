@@ -1,10 +1,9 @@
 
-import os
 import logging
+import os
 from typing import Any
 
 from qdrant_client import QdrantClient
-from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +44,9 @@ class QdrantService:
                 collection_name=self.collection_name
             )
 
-        except Exception as e:
-            logger.error(
-                "Error conectando con Qdrant: %s", e
+        except Exception:
+            logger.exception(
+                "[QDRANT SERVICE] Error conectando con QDrant."
             )
             return False
 
@@ -107,9 +106,9 @@ class QdrantService:
 
             return results
 
-        except Exception as e:
+        except Exception:
             logger.exception(
-                "Error durante la búsqueda en Qdrant: %s", e
+                "[QDRANT_SERVICE] Error durante la búsqueda en Qdrant."
             )
             return []
 
