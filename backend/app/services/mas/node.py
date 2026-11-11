@@ -1,4 +1,4 @@
-from typing import List
+
 from langchain_core.messages import AIMessage, BaseMessage, SystemMessage
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 
@@ -9,7 +9,7 @@ class AgentNode:
         self.llm = ChatNVIDIA(**model_kwargs)
         self.system_prompt = system_prompt
 
-    async def __call__(self, messages: List[BaseMessage]) -> AIMessage:
+    async def __call__(self, messages: list[BaseMessage]) -> AIMessage:
         """Invocación asíncrona al LLM."""
         if self.system_prompt:
             messages = [SystemMessage(content=self.system_prompt), *messages]

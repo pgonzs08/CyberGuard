@@ -1,7 +1,9 @@
-from langchain_core.messages import HumanMessage, AIMessage
+from backend.app.services.mongo_Service import MongoService
+from backend.app.services.qdrant_service import QdrantService
+from langchain_core.messages import AIMessage, HumanMessage
+
 from app.services.mas.graph import build_cyberguard_graph, build_simple_graph
-from app.services.mongoService import MongoService
-from app.services.qdrantService import QdrantService
+
 
 class ChatService:
     def __init__(self, qdrant_service: QdrantService, mongo_db: MongoService = None):
@@ -35,16 +37,7 @@ class ChatService:
             "draft_response": "",
             "final_response": ""
         }
-        try:
-            # Flujo de CyberGuard
-            result = await self._graph.ainvoke(initial_state)
-        
-        except Exception as e:
-            # Intenta flujo conversacional
-            print(e)
-            for tb in e.__traceback__:
-                print(tb)
-            result = await self._cgraph.ainvoke(initial_state)
+        result = await self._graph.ainvoke(initial_state)
 
         response_text = result.get("final_response", "No se pudo generar respuesta.")
         route_taken = result.get("route", "unknown")

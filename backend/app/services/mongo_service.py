@@ -1,8 +1,10 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from motor.motor_asyncio import AsyncIOMotorClient
-from app.core.dal.conversation import ConversationDAL, Conversation, MessageEntry, Message, ConversationSummary
+
+from app.core.dal.conversation import Conversation, ConversationDAL, MessageEntry
 from app.core.settings import MONGO_URI
+
 
 class MongoService:
     def __init__(self):
@@ -33,7 +35,7 @@ class MongoService:
         return id
 
     async def add_message(self, conversation_id, message, role) -> Conversation:
-        msg = MessageEntry(content=message, role=role, timetag=datetime.now(tz=timezone.utc).isoformat())
+        msg = MessageEntry(content=message, role=role, timetag=datetime.now(tz=UTC).isoformat())
         conversation = await self._conversation_dal.add_message(id=conversation_id, message=msg)
 
         return conversation

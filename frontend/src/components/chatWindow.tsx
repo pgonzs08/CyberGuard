@@ -8,6 +8,8 @@ import {
   User,
   Loader2
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { Conversation, Message } from '../model/datamodel';
 
 interface ChatWindowProps {
@@ -45,13 +47,17 @@ const ChatMessage = forwardRef<HTMLDivElement, Message>(function ChatMessage(
         {isUser ? <User className="h-4 w-4" /> : <Sparkles className="h-4 w-4 text-[var(--color-primary-500)]" />}
       </div>
 
-      {/* Burbuja de Contenido */}
-      <div className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
+      {/* Burbuja de Contenido con soporte Markdown */}
+      <div className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm overflow-hidden ${
         isUser
           ? 'bg-[var(--color-primary-500)] text-white rounded-br-none shadow-[var(--color-primary-500)]/10'
           : 'bg-[var(--color-surface-card)] border border-[var(--color-border-subtle)] text-[var(--color-text-main)] rounded-bl-none backdrop-blur-md'
       }`}>
-        <p className="whitespace-pre-wrap">{content}</p>
+      <div className="markdown-content prose prose-sm max-w-none break-words dark:prose-invert">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {content}
+        </ReactMarkdown>
+      </div>
         <span className={`text-[10px] block mt-1.5 text-right ${isUser ? 'text-[var(--color-primary-100)]' : 'text-[var(--color-text-muted)]'}`}>
           {timetag}
         </span>

@@ -2,11 +2,11 @@ import functools
 import json
 import logging
 from typing import Annotated, TypedDict
- 
-from langgraph.graph import StateGraph, END
+
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
- 
+
 from app.services.mas.node import AgentNode
 
 logging.basicConfig(level=logging.INFO)
@@ -22,10 +22,9 @@ def log_node_errors(node_name: str):
         async def wrapper(*args, **kwargs):
             try:
                 return await func(*args, **kwargs)
-            except Exception as e:
-                logger.error(
-                    f"[{node_name}] Fallo en el nodo: {e!r}",
-                    exc_info=True,
+            except Exception:
+                logger.exception(
+                    f"[{node_name}] Fallo en el nodo."
                 )
                 raise
         return wrapper
@@ -94,6 +93,9 @@ async def router_node(state: CyberGuardState):
     query = state["resolved_query"]
     prompt = f"Clasifica la siguiente consulta en exactamente una de estas dos categorías: 'cve' (si pregunta por vulnerabilidades técnicas, parches, cves específicos) o 'general' (si es charla o buenas prácticas).\nConsulta: {query}\nResponde solo 'cve' o 'general':"
     response = await router_agent([HumanMessage(content=prompt)])
+    logger.info(f"CONTENT: {response.content!r}")
+    logger.info(f"METADATA: {response.response_metadata}")
+    logger.info(f"USAGE: {response.usage_metadata}")
     route = "cve" if "cve" in response.content.lower() else "general"
     return {"route": route}
 

@@ -2,9 +2,8 @@
 FastAPI Server
 """
 
-import sys
 import logging
-
+import sys
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -12,8 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.api_router import router as api_router
-import app.core.settings as settings
-
+from app.core import settings
 
 MONGO_URI = settings.MONGO_URI
 DEBUG = settings.DEBUG
