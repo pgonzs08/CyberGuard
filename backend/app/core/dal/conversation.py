@@ -6,9 +6,10 @@ from motor.motor_asyncio import AsyncIOMotorCollection
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
 
-class MessageBase(BaseModel):
+class MessageEntry(BaseModel):
     content: str = Field(..., examples=["How can I make a safe password?"], description="Content of a new message")
     role: str = Field(..., description="Who sent the message")
+    timetag: datetime = Field(..., description="When was the message sent")
 
 class Message(BaseModel):
     id: str
@@ -34,7 +35,7 @@ class Message(BaseModel):
         )
 
     @staticmethod
-    def from_msg(msg: MessageBase) -> 'Message':
+    def from_msg(msg: MessageEntry) -> 'Message':
         return Message(
             id=uuid4().hex,
             role=msg.role,
@@ -117,7 +118,8 @@ class ConversationDAL:
         """
         Devuelve el resumen de todas las conversaciones
         """
-        async for doc in self._collection.find(
+
+        cursor = self._collection.find(
             {},
             projection={
                 "name": 1,
@@ -127,13 +129,15 @@ class ConversationDAL:
             },
             sort={"creation_date": 1},
             session=session
-        ):
-            # Corregido: Llamaba a .from_doc() que no existía en el modelo original
-            yield ConversationSummary.from_doc(doc) if doc else doc
+        )
+        docs = await cursor.to_list(length=50)
+
+        return [ConversationSummary.from_doc(doc) for doc in docs if doc]
+        
 
     async def create_conversation(self, owner: str | ObjectId, name: str, session=None) -> str:
         # Aseguramos que guardamos un ObjectId real en la base de datos de Mongo para indexación eficiente
-        db_owner = ObjectId(owner) if isinstance(owner, str) else owner
+        db_owner = "ROLE_ADMIN"#ObjectId(owner) if isinstance(owner, str) else owner
         
         response = await self._collection.insert_one(
             {
@@ -160,7 +164,7 @@ class ConversationDAL:
         )
         return response.deleted_count == 1
 
-    async def add_message(self, id: str | ObjectId, message: MessageBase, session=None) -> Conversation | None:
+    async def add_message(self, id: str | ObjectId, message: MessageEntry, session=None) -> Conversation | None:
         result = await self._collection.find_one_and_update(
             {"_id": ObjectId(id)},
             {
@@ -169,7 +173,7 @@ class ConversationDAL:
                         "id": uuid4().hex, # Cambiado a "id" para mantener consistencia con Pydantic
                         "role": message.role,
                         "content": message.content, 
-                        "timetag": datetime.now(tz=timezone.utc).isoformat()
+                        "timetag": message.timetag
                     }
                 }
             },
