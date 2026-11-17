@@ -1,5 +1,5 @@
-from backend.app.services.mongo_Service import MongoService
-from backend.app.services.qdrant_service import QdrantService
+from app.services.mongo_service import MongoService
+from app.services.qdrant_service import QdrantService
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.services.mas.graph import build_cyberguard_graph, build_simple_graph

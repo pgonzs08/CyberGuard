@@ -1,0 +1,21 @@
+# API HTTP y servidor ASGI (healthcheck/documentación)
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.27,<1.0
+
+# Configuración mediante variables de entorno
+pydantic>=2.6,<3.0
+pydantic-settings>=2.2,<3.0
+
+# Cliente de Qdrant
+qdrant-client>=1.20,<2.0
+
+# Cliente HTTP asíncrono para NVIDIA NIM
+httpx>=0.27,<1.0
+
+# Servidor y generación de stubs gRPC / Protocol Buffers
+grpcio>=1.62,<2.0
+grpcio-tools>=1.62,<2.0
+protobuf>=4.25,<6.0
+
+# Reintentos ante fallos transitorios de red/servicios externos
+tenacity>=8.2,<10.0

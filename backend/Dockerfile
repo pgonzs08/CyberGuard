@@ -16,6 +16,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 FROM python:3.11-slim AS runner
 
+RUN useradd -m appuser
+
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -25,9 +27,8 @@ COPY --from=builder /opt/venv /opt/venv
 
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY . .
+COPY --chown=appuser:appuser . .
 
-RUN useradd -m appuser && chown -R appuser:appuser .
 USER appuser
 
 EXPOSE 8000
