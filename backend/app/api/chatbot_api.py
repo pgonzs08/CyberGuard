@@ -10,7 +10,7 @@ from app.services.qdrant_service import get_qdrant_service
 from fastapi import APIRouter, Depends, Path, status
 from pydantic import BaseModel, Field
 
-from app.core.dal.conversation import ConversationSummary
+from backend.app.model.conversation import ConversationSummary
 
 
 class MessageAnswer(BaseModel):

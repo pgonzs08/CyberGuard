@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from app.core.dal.conversation import Conversation, ConversationDAL, MessageEntry
+from backend.app.model.conversation import Conversation, ConversationDAL, MessageEntry
 from app.core.settings import MONGO_URI
 
 
