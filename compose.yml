@@ -16,13 +16,15 @@ services:
     environment:
       NVIDIA_API_KEY: ${NVIDIA_API_KEY}
       MONGO_URI: mongodb://mongo:27017/cyberguard
+      # QDrant Handler: el backend solo consulta (gRPC de solo lectura, README 7.3).
+      # No dispone de credenciales ni de ruta de red hacia Qdrant (README 7.7).
+      QDRANT_SERVICE_URL: http://qdrant_service:8080
       QDRANT_SERVICE_HOST: qdrant_service
       QDRANT_SERVICE_PORT: "50051"
 
     depends_on:
       mongo:
         condition: service_healthy
-
       qdrant_service:
         condition: service_healthy
 
@@ -32,6 +34,17 @@ services:
     dns:
       - 8.8.8.8
       - 1.1.1.1
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
     command: >
       uvicorn app.main:app
@@ -59,47 +72,24 @@ services:
 
 
   # ------------------------------------------
-  # Frontend UI (React + Vite)
+  # Frontend UI (React 19 + Vite 8 + Caddy)
   # ------------------------------------------
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
 
     container_name: cyberguard_frontend
 
     ports:
-      - "80:80"
-      - "5173:5173"
+      - "8080:8080"
 
     networks:
       - cyberguard_net
 
-    environment:
-      CHOKIDAR_USEPOLLING: "true"
-      VITE_API_URL: http://localhost:8000
-
-    command: npm run dev -- --host 0.0.0.0
-
-    develop:
-      watch:
-        - action: sync
-          path: ./frontend
-          target: /app
-          ignore:
-            - node_modules/
-            - dist/
-            - .git/
-            - .vite/
-
-        - action: rebuild
-          path: ./frontend/package.json
-
-        - action: rebuild
-          path: ./frontend/package-lock.json
-
-        - action: rebuild
-          path: ./frontend/Dockerfile.dev
+    depends_on:
+      backend:
+        condition: service_healthy
 
 
   # ------------------------------------------
@@ -122,9 +112,8 @@ services:
         - mongosh
         - --eval
         - db.adminCommand('ping')
-
-      interval: 30s
-      timeout: 10s
+      interval: 5s
+      timeout: 5s
       retries: 5
 
     networks:
@@ -135,24 +124,13 @@ services:
   # Qdrant Vector Database
   # ------------------------------------------
   qdrant:
-    image: qdrant/qdrant:v1.20.0
+    image: qdrant/qdrant:v1.20
 
     container_name: cyberguard_qdrant
 
-    healthcheck:
-      test:
-        - CMD
-        - bash
-        - -c
-        - >-
-          exec 3<>/dev/tcp/127.0.0.1/6333 &&
-          printf 'GET /readyz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
-          read -r status <&3 &&
-          [[ $$status == *' 200 '* ]]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+    # Sin puertos publicados: solo qdrant_service puede acceder a Qdrant (README 7.7).
+    # Para depurar en local, publicar el puerto 6333 desde un compose.override.yml
+    # (y quitar `internal: true` de qdrant_internal_net mientras tanto).
 
     volumes:
       - qdrant_data:/qdrant/storage
@@ -175,7 +153,7 @@ services:
       # HTTP: healthcheck y documentación (útil en desarrollo).
       - "8080:8080"
 
-    # gRPC: accesible únicamente desde la red interna de servicios,
+    # gRPC (solo lectura): accesible únicamente desde la red interna de servicios,
     # no se publica en el host.
     expose:
       - "50051"
@@ -189,6 +167,11 @@ services:
       QDRANT_CVE_COLLECTION: cyberguard_cves
       QDRANT_MITRE_COLLECTION: cyberguard_mitre_attack
 
+      # Perfil de bajo consumo de memoria (ver config.py)
+      QDRANT_LOW_MEMORY: ${QDRANT_LOW_MEMORY:-true}
+      QDRANT_HNSW_ON_DISK: ${QDRANT_HNSW_ON_DISK:-false}
+      QDRANT_SEARCH_OVERSAMPLING: ${QDRANT_SEARCH_OVERSAMPLING:-3.0}
+
       # NVIDIA NIM
       NVIDIA_API_KEY: ${NVIDIA_API_KEY}
       NVIDIA_EMBEDDING_MODEL: ${NVIDIA_EMBEDDING_MODEL}
@@ -196,14 +179,26 @@ services:
       # Sincronización autónoma de las colecciones (UpdateWorker, README 7.5)
       SYNC_INTERVAL_HOURS: ${SYNC_INTERVAL_HOURS:-24}
 
+      # Clave del NVD (opcional): sin ella el límite de peticiones es muy bajo
+      NVD_API_KEY: ${NVD_API_KEY:-}
+
+      # Años de CVEs que se cargan en la primera sincronización ("all" = todo el histórico)
+      NVD_BACKFILL_YEARS: ${NVD_BACKFILL_YEARS:-2}
+
       # Configuración de la API
       SERVICE_HOST: 0.0.0.0
       SERVICE_PORT: "8080"
 
+      # Servidor gRPC (solo lectura)
+      GRPC_PORT: "50051"
+
     depends_on:
       qdrant:
-        condition: service_healthy
+        condition: service_started
 
+    # Único servicio conectado a ambas redes: recibe las consultas del backend
+    # (cyberguard_net) y es el único que accede a Qdrant (qdrant_internal_net).
+    # Necesita salida a Internet (NVD, MITRE ATT&CK, NVIDIA NIM) vía cyberguard_net.
     networks:
       - cyberguard_net
       - qdrant_internal_net
@@ -220,7 +215,6 @@ services:
         - python
         - -c
         - "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=3)"
-
       interval: 10s
       timeout: 5s
       retries: 10
@@ -252,6 +246,8 @@ networks:
     driver: bridge
 
   # Red aislada para la base vectorial: solo qdrant y qdrant_service.
+  # `internal: true` impide la salida a Internet y la publicación de puertos,
+  # y el backend no tiene ruta hasta Qdrant.
   qdrant_internal_net:
     name: qdrant_internal_net
     driver: bridge
