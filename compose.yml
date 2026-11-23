@@ -1,32 +1,59 @@
 services:
-  # --- Backend API (FastAPI + RAG Engine) ---
+
+  # ------------------------------------------
+  # Backend API (FastAPI + RAG Engine)
+  # ------------------------------------------
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+
     container_name: cyberguard_backend
+
     ports:
       - "8000:8000"
+
     environment:
-      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
-      - MONGO_URI=mongodb://mongo:27017/cyberguard
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY}
+      MONGO_URI: mongodb://mongo:27017/cyberguard
+      # QDrant Handler: el backend solo consulta (gRPC de solo lectura, README 7.3).
+      # No dispone de credenciales ni de ruta de red hacia Qdrant (README 7.7).
+      QDRANT_SERVICE_URL: http://qdrant_service:8080
+      QDRANT_SERVICE_HOST: qdrant_service
+      QDRANT_SERVICE_PORT: "50051"
+
     depends_on:
       mongo:
         condition: service_healthy
-      qdrant:
-        condition: service_started
+      qdrant_service:
+        condition: service_healthy
+
     networks:
       - cyberguard_net
+
     dns:
       - 8.8.8.8
       - 1.1.1.1
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    # --- CONFIGURACIÓN DE DOCKER COMPOSE WATCH ---
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+
     develop:
       watch:
-        # Sincroniza los cambios de código fuente en tiempo real
         - action: sync
           path: ./backend
           target: /app
@@ -36,77 +63,200 @@ services:
             - .git/
             - .venv/
             - "*.egg-info/"
-        # Si cambian las dependencias, reconstruye la imagen automáticamente
+
         - action: rebuild
           path: ./backend/requirements.txt
-        # Si cambia el propio Dockerfile, reconstruye también
+
         - action: rebuild
           path: ./backend/Dockerfile
 
-  # --- Frontend UI (React + Vite served by Nginx) ---
+
+  # ------------------------------------------
+  # Frontend UI (React 19 + Vite 8 + Caddy)
+  # ------------------------------------------
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
+
     container_name: cyberguard_frontend
+
     ports:
-      - "80:80"
-      - "5173:5173"
+      - "8080:8080"
+
     networks:
       - cyberguard_net
-    environment:
-      - CHOKIDAR_USEPOLLING=true  # Útil si estás en Windows/Mac para que Docker detecte los cambios de archivos
-      - VITE_API_URL=http://localhost:8000
-    command: npm run dev -- --host 0.0.0.0
-    develop:
-      watch:
-        - action: sync
-          path: ./frontend
-          target: /app
-          ignore:
-            - node_modules/
-            - dist/
-            - .git/
-            - .vite/
-        - action: rebuild
-          path: ./frontend/package.json
-        - action: rebuild
-          path: ./frontend/package-lock.json
-        - action: rebuild
-          path: ./frontend/Dockerfile.dev
 
-  # --- Base de Datos NoSQL (MongoDB) ---
+    depends_on:
+      backend:
+        condition: service_healthy
+
+
+  # ------------------------------------------
+  # MongoDB
+  # ------------------------------------------
   mongo:
     image: mongo:7.0
+
     container_name: cyberguard_mongo
+
     ports:
       - "27017:27017"
+
     volumes:
       - mongo_data:/data/db
+
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test:
+        - CMD
+        - mongosh
+        - --eval
+        - db.adminCommand('ping')
       interval: 5s
       timeout: 5s
       retries: 5
+
     networks:
       - cyberguard_net
 
-  # --- Base de Datos Vectorial (Qdrant) ---
+
+  # ------------------------------------------
+  # Qdrant Vector Database
+  # ------------------------------------------
   qdrant:
-    image: qdrant/qdrant:v1.8.0
+    image: qdrant/qdrant:v1.20
+
     container_name: cyberguard_qdrant
-    ports:
-      - "6333:6333"
+
+    # Sin puertos publicados: solo qdrant_service puede acceder a Qdrant (README 7.7).
+    # Para depurar en local, publicar el puerto 6333 desde un compose.override.yml
+    # (y quitar `internal: true` de qdrant_internal_net mientras tanto).
+
     volumes:
       - qdrant_data:/qdrant/storage
+
+    networks:
+      - qdrant_internal_net
+
+
+  # ------------------------------------------
+  # Qdrant Management Microservice
+  # ------------------------------------------
+  qdrant_service:
+    build:
+      context: ./qdrant_service
+      dockerfile: Dockerfile
+
+    container_name: cyberguard_qdrant_service
+
+    ports:
+      # HTTP: healthcheck y documentación (útil en desarrollo).
+      - "8080:8080"
+
+    # gRPC (solo lectura): accesible únicamente desde la red interna de servicios,
+    # no se publica en el host.
+    expose:
+      - "50051"
+
+    environment:
+      # Conexión interna con la base de datos vectorial
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+
+      # Colecciones independientes
+      QDRANT_CVE_COLLECTION: cyberguard_cves
+      QDRANT_MITRE_COLLECTION: cyberguard_mitre_attack
+
+      # Perfil de bajo consumo de memoria (ver config.py)
+      QDRANT_LOW_MEMORY: ${QDRANT_LOW_MEMORY:-true}
+      QDRANT_HNSW_ON_DISK: ${QDRANT_HNSW_ON_DISK:-false}
+      QDRANT_SEARCH_OVERSAMPLING: ${QDRANT_SEARCH_OVERSAMPLING:-3.0}
+
+      # NVIDIA NIM
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY}
+      NVIDIA_EMBEDDING_MODEL: ${NVIDIA_EMBEDDING_MODEL}
+
+      # Sincronización autónoma de las colecciones (UpdateWorker, README 7.5)
+      SYNC_INTERVAL_HOURS: ${SYNC_INTERVAL_HOURS:-24}
+
+      # Clave del NVD (opcional): sin ella el límite de peticiones es muy bajo
+      NVD_API_KEY: ${NVD_API_KEY:-}
+
+      # Años de CVEs que se cargan en la primera sincronización ("all" = todo el histórico)
+      NVD_BACKFILL_YEARS: ${NVD_BACKFILL_YEARS:-2}
+
+      # Configuración de la API
+      SERVICE_HOST: 0.0.0.0
+      SERVICE_PORT: "8080"
+
+      # Servidor gRPC (solo lectura)
+      GRPC_PORT: "50051"
+
+    depends_on:
+      qdrant:
+        condition: service_started
+
+    # Único servicio conectado a ambas redes: recibe las consultas del backend
+    # (cyberguard_net) y es el único que accede a Qdrant (qdrant_internal_net).
+    # Necesita salida a Internet (NVD, MITRE ATT&CK, NVIDIA NIM) vía cyberguard_net.
     networks:
       - cyberguard_net
+      - qdrant_internal_net
 
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8080
+      --reload
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+    develop:
+      watch:
+        - action: sync
+          path: ./qdrant_service/app
+          target: /app/app
+          ignore:
+            - __pycache__/
+            - "*.pyc"
+
+        - action: rebuild
+          path: ./qdrant_service/requirements.txt
+
+        - action: rebuild
+          path: ./qdrant_service/Dockerfile
+
+
+# ------------------------------------------
+# Networks
+# ------------------------------------------
 networks:
+  # Servicios de aplicación: frontend, backend, mongo y qdrant_service.
   cyberguard_net:
     name: cyberguard_net
     driver: bridge
 
+  # Red aislada para la base vectorial: solo qdrant y qdrant_service.
+  # `internal: true` impide la salida a Internet y la publicación de puertos,
+  # y el backend no tiene ruta hasta Qdrant.
+  qdrant_internal_net:
+    name: qdrant_internal_net
+    driver: bridge
+    internal: true
+
+
+# ------------------------------------------
+# Persistent Volumes
+# ------------------------------------------
 volumes:
   mongo_data:
   qdrant_data:

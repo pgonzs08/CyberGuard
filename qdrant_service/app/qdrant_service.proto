@@ -1,0 +1,293 @@
+// =============================================================================
+// qdrant_service.proto
+//
+// Contrato gRPC de QDrant Handler (microservicio `qdrant_service`).
+// Referencia: README.md, sección 7 (7.2, 7.3, 7.5, 7.6 y 7.8).
+//
+// PRINCIPIO DE DISEÑO: SOLO LECTURA
+// ---------------------------------
+// Este contrato expone únicamente operaciones de consulta. NO define ninguna
+// operación de escritura (ingestar, actualizar o eliminar documentos, crear o
+// eliminar colecciones). La ingestión es interna del microservicio y la ejecuta
+// su UpdateWorker; el backend no puede invocarla. Cualquier ampliación futura de
+// este servicio debe mantener esta restricción.
+//
+// CORRESPONDENCIA CON LA API REST DEL BACKEND (README, sección 5)
+// ---------------------------------------------------------------
+//   GET /api/cves                    -> ListCVEs
+//   GET /api/cves/{cve}              -> GetCVE
+//   GET /api/mitre/tacticas          -> ListTactics
+//   GET /api/mitre/tecnicas/{id}     -> GetTechnique
+//   Agente de recuperación (RAG)     -> SearchCVEs, SearchMITRE
+//   Monitorización del backend       -> HealthCheck
+//
+// Los nombres de campo se definen en inglés (convención del código); el backend
+// los traduce a los campos en español de la API REST (p. ej. `severity` ->
+// `severidad`, `technique_id` -> `tecnica_id`). Los campos que la API REST
+// define sin fuente oficial (`descripcion_simple`, `mitigacion_recomendada`)
+// quedan fuera de este contrato por ahora.
+//
+// CÓDIGOS DE ESTADO gRPC
+// ----------------------
+//   INVALID_ARGUMENT   Consulta vacía, identificador mal formado, `page_token`
+//                      inválido o parámetros fuera de rango.
+//   NOT_FOUND          El identificador solicitado (GetCVE, GetTechnique) no
+//                      está indexado. Una búsqueda sin coincidencias NO es un
+//                      error: devuelve una lista vacía con estado OK.
+//   UNAVAILABLE        Qdrant o NVIDIA NIM no están disponibles (reintentable).
+//   DEADLINE_EXCEEDED  La operación superó el plazo indicado por el cliente.
+//   INTERNAL           Error inesperado del servicio.
+//
+// COMPATIBILIDAD
+// --------------
+// Paquete versionado (v1). Los cambios compatibles solo añaden campos o
+// mensajes nuevos; los números de campo ya publicados no se reutilizan.
+// =============================================================================
+
+syntax = "proto3";
+
+package cyberguard.qdrant.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// -----------------------------------------------------------------------------
+// Servicio
+// -----------------------------------------------------------------------------
+service QdrantService {
+  // Recuperación semántica de vulnerabilidades CVE (colección `cyberguard_cves`).
+  rpc SearchCVEs(SearchCVEsRequest) returns (SearchCVEsResponse);
+
+  // Recuperación semántica de tácticas y técnicas MITRE ATT&CK
+  // (colección `cyberguard_mitre_attack`).
+  rpc SearchMITRE(SearchMITRERequest) returns (SearchMITREResponse);
+
+  // Consulta directa de un CVE por su identificador (no genera embeddings).
+  rpc GetCVE(GetCVERequest) returns (GetCVEResponse);
+
+  // Listado paginado de los CVEs indexados (no genera embeddings).
+  rpc ListCVEs(ListCVEsRequest) returns (ListCVEsResponse);
+
+  // Consulta directa de una técnica o subtécnica ATT&CK por su identificador
+  // (no genera embeddings).
+  rpc GetTechnique(GetTechniqueRequest) returns (GetTechniqueResponse);
+
+  // Listado de las tácticas ATT&CK indexadas (no genera embeddings).
+  rpc ListTactics(ListTacticsRequest) returns (ListTacticsResponse);
+
+  // Comprobación del estado y la disponibilidad del microservicio.
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// -----------------------------------------------------------------------------
+// Modelo: vulnerabilidades
+// -----------------------------------------------------------------------------
+
+// Severidad cualitativa según el esquema CVSS. El backend se encarga de su
+// presentación al usuario (p. ej. CRITICAL -> "Crítica").
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;  // Sin puntuación disponible (p. ej. CVE sin analizar).
+  SEVERITY_NONE = 1;
+  SEVERITY_LOW = 2;
+  SEVERITY_MEDIUM = 3;
+  SEVERITY_HIGH = 4;
+  SEVERITY_CRITICAL = 5;
+}
+
+// Referencia externa asociada a un CVE.
+message Reference {
+  string url = 1;
+  string source = 2;  // Origen de la referencia indicado por el NVD.
+}
+
+// Vulnerabilidad CVE completa.
+message CVE {
+  // Identificador oficial, p. ej. "CVE-2021-44228".
+  string cve_id = 1;
+
+  // Descripción tal como figura en la fuente (normalmente en inglés).
+  string description = 2;
+
+  Severity severity = 3;
+
+  // Puntuación base CVSS (0.0 - 10.0). Ausente si la fuente no la proporciona;
+  // se declara `optional` porque 0.0 es un valor válido distinto de "sin dato".
+  optional double cvss_score = 4;
+
+  // Versión de CVSS de la que proceden `cvss_score` y `severity`, p. ej. "3.1".
+  string cvss_version = 5;
+
+  // Debilidades asociadas, p. ej. "CWE-502".
+  repeated string cwe_ids = 6;
+
+  repeated Reference references = 7;
+
+  google.protobuf.Timestamp published_at = 8;
+  google.protobuf.Timestamp last_modified_at = 9;
+}
+
+// Versión resumida de un CVE para listados.
+message CVESummary {
+  string cve_id = 1;
+  Severity severity = 2;
+
+  // Extracto breve de la descripción, generado por el propio servicio.
+  string summary = 3;
+}
+
+// -----------------------------------------------------------------------------
+// Modelo: MITRE ATT&CK
+// -----------------------------------------------------------------------------
+
+// Táctica ATT&CK, p. ej. "TA0001" (Initial Access).
+message Tactic {
+  string tactic_id = 1;
+  string name = 2;
+  string description = 3;
+}
+
+// Medida de mitigación asociada a una técnica, p. ej. "M1051".
+message Mitigation {
+  string mitigation_id = 1;
+  string name = 2;
+  string description = 3;
+}
+
+// Técnica o subtécnica ATT&CK, p. ej. "T1190" o "T1059.001".
+message Technique {
+  string technique_id = 1;
+  string name = 2;
+  string description = 3;
+
+  // Identificadores de las tácticas a las que pertenece, p. ej. ["TA0001"].
+  repeated string tactic_ids = 4;
+
+  // Plataformas afectadas, p. ej. "Windows", "Linux".
+  repeated string platforms = 5;
+
+  bool is_subtechnique = 6;
+
+  // Identificador de la técnica padre. Vacío si no es una subtécnica.
+  string parent_technique_id = 7;
+
+  repeated Mitigation mitigations = 8;
+
+  // Enlace a la ficha oficial en attack.mitre.org.
+  string url = 9;
+}
+
+// -----------------------------------------------------------------------------
+// SearchCVEs
+// -----------------------------------------------------------------------------
+message SearchCVEsRequest {
+  // Consulta en lenguaje natural. No puede estar vacía.
+  string query = 1;
+
+  uint32 limit = 2;
+}
+
+message CVESearchResult {
+  CVE cve = 1;
+
+  // Puntuación de similitud devuelta por Qdrant. Los resultados llegan
+  // ordenados de mayor a menor.
+  float score = 2;
+}
+
+message SearchCVEsResponse {
+  repeated CVESearchResult results = 1;
+}
+
+// -----------------------------------------------------------------------------
+// SearchMITRE
+// -----------------------------------------------------------------------------
+message SearchMITRERequest {
+  // Consulta en lenguaje natural. No puede estar vacía.
+  string query = 1;
+
+  // Mismo comportamiento que `SearchCVEsRequest.limit`.
+  uint32 limit = 2;
+}
+
+// Resultado de una búsqueda MITRE: una táctica o una técnica.
+message MitreSearchResult {
+
+  float score = 1;
+
+  oneof item {
+    Tactic tactic = 2;
+    Technique technique = 3;
+  }
+}
+
+message SearchMITREResponse {
+  repeated MitreSearchResult results = 1;
+}
+
+// -----------------------------------------------------------------------------
+// GetCVE / ListCVEs
+// -----------------------------------------------------------------------------
+message GetCVERequest {
+
+  string cve_id = 1;
+}
+
+message GetCVEResponse {
+  CVE cve = 1;
+}
+
+message ListCVEsRequest {
+
+  uint32 page_size = 1;
+
+  string page_token = 2;
+}
+
+message ListCVEsResponse {
+  repeated CVESummary cves = 1;
+
+  string next_page_token = 2;
+}
+
+// -----------------------------------------------------------------------------
+// GetTechnique / ListTactics
+// -----------------------------------------------------------------------------
+message GetTechniqueRequest {
+  string technique_id = 1;
+}
+
+message GetTechniqueResponse {
+  Technique technique = 1;
+}
+
+message ListTacticsRequest {}
+
+message ListTacticsResponse {
+  repeated Tactic tactics = 1;
+}
+
+// -----------------------------------------------------------------------------
+// HealthCheck
+// -----------------------------------------------------------------------------
+message HealthCheckRequest {}
+
+enum ServingStatus {
+  SERVING_STATUS_UNSPECIFIED = 0;
+
+  SERVING_STATUS_SERVING = 1;
+
+  SERVING_STATUS_DEGRADED = 2;
+
+  SERVING_STATUS_NOT_SERVING = 3;
+}
+
+message CollectionStatus {
+  string name = 1;  // p. ej. "cyberguard_cves".
+  uint64 documents_count = 2;
+
+  google.protobuf.Timestamp last_successful_sync_at = 3;
+}
+
+message HealthCheckResponse {
+  ServingStatus status = 1;
+  repeated CollectionStatus collections = 2;
+}
