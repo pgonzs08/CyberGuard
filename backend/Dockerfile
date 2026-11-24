@@ -19,7 +19,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copiar únicamente requirements.txt primero para optimizar la caché de capas de Docker
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir --requirement requirements.txt
 
 # ==========================================
 # ETAPA 2: Runner (Entorno de Producción)
