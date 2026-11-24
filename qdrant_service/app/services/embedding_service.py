@@ -24,7 +24,7 @@ import asyncio
 import logging
 import time
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 import httpx
 from tenacity import (
@@ -199,7 +199,7 @@ class EmbeddingService:
         if self._owns_client:
             await self._client.aclose()
 
-    async def __aenter__(self) -> EmbeddingService:
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *exc_info: object) -> None:
