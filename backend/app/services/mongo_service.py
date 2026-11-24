@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 
-from backend.app.model.conversation import Conversation, ConversationDAL, MessageEntry
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.core.settings import MONGO_URI
+from backend.app.model.conversation import Conversation, ConversationDAL, MessageEntry
 
 
 class MongoService:
