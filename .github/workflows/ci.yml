@@ -46,21 +46,18 @@ jobs:
     
   hadolint:
     runs-on: ubuntu-latest
-    matrix:
-      dockerfile:
-        - backend/Dockerfile
-        - frontend/Dockerfile
-        - qdrant_service/Dockerfile
+    strategy:
+      matrix:
+        dockerfile:
+          - ./backend/Dockerfile
+          - ./frontend/Dockerfile
+          - ./qdrant_service/Dockerfile
     steps:
       - name: Instalar Hadolint para validar Dockerfiles
-        runs-on: ubuntu-latest
-        steps:
-          uses: hadolint/hadolint-action@v3.1.0
-          with:
-            dockerfile: ${{matrix.dockerfile}}
-            failure-threshold: warning
-
-      - name: Ejecutar Hadolint en los Dockerfiles de los microservicios
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ${{ matrix.dockerfile }}
+          failure-threshold: warning
 
   # ------------------------------------------
   # 2. Pruebas unitarias (Backend y Frontend)
