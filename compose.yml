@@ -82,14 +82,10 @@ services:
     container_name: cyberguard_frontend
 
     ports:
-      - "8080:8080"
+      - "80:80"
 
     networks:
       - cyberguard_net
-
-    depends_on:
-      backend:
-        condition: service_healthy
 
 
   # ------------------------------------------

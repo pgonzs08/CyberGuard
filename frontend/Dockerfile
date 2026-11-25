@@ -35,7 +35,7 @@ COPY --from=builder --chown=appuser:appgroup /app/dist /srv
 
 # Configurar Caddy en puerto no privilegiado 8080 con soporte SPA y almacenamiento en /tmp
 RUN mkdir -p /etc/caddy /tmp/caddy-data /tmp/caddy-config && \
-    printf ':8080 {\n\
+    printf ':80 {\n\
     root * /srv\n\
     try_files {path} /index.html\n\
     file_server\n\
@@ -48,6 +48,6 @@ ENV XDG_DATA_HOME=/tmp/caddy-data \
 
 USER appuser
 
-EXPOSE 8080
+EXPOSE 80
 
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
