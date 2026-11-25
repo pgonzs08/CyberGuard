@@ -4,12 +4,12 @@
 import uuid
 from datetime import UTC, datetime
 
-from app.services.chat import ChatService
-from app.services.mongo_service import MongoService, get_mongo_service
-from app.services.qdrant_service import get_qdrant_service
 from fastapi import APIRouter, Depends, Path, status
 from pydantic import BaseModel, Field
 
+from app.services.chat import ChatService
+from app.services.mongo_service import MongoService, get_mongo_service
+from app.services.qdrant_service import get_qdrant_service
 from backend.app.model.conversation import ConversationSummary
 
 
