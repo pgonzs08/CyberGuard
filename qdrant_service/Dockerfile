@@ -18,7 +18,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copiar requirements.txt antes del código fuente para aprovechar la caché de capas
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir --requirement requirements.txt
 
 # ==========================================
 # ETAPA 2: Runner (Entorno de Producción)
